@@ -663,14 +663,6 @@
             font-size: 0.85rem;
         }
 
-        .color-tag {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 4px;
-        }
-
         .tag-won {
             background: rgba(16, 185, 129, 0.15);
             color: var(--green);
@@ -776,7 +768,6 @@
             font-family: 'Courier New', Courier, monospace;
         }
 
-        /* Toast Notifications */
         #toast {
             position: fixed;
             bottom: 2rem;
@@ -816,7 +807,7 @@
     <nav class="top-nav">
         <div class="nav-tab active" onclick="switchNav('game', this)">🎮 Play & Live Draws</div>
         <div class="nav-tab" onclick="switchNav('api', this)">⚡ API Endpoints & Testing</div>
-        <div class="nav-tab" onclick="switchNav('schema', this)">🗄️ Database & Cron Setup</div>
+        <div class="nav-tab" onclick="switchNav('schema', this)">🗄️ Database & WebAPI Setup</div>
     </nav>
 
     <main>
@@ -824,23 +815,23 @@
         <div id="tab-game" class="tab-content active">
             <!-- Game selector -->
             <div class="game-selector">
-                <div class="game-btn active" onclick="selectGame('WinGo_30S', this)">
+                <div class="game-btn active" id="btn-WinGo_30S" onclick="selectGame('WinGo_30S', this)">
                     <div class="name">WinGo 30S</div>
                     <div class="time">30 Seconds</div>
                 </div>
-                <div class="game-btn" onclick="selectGame('WinGo_1M', this)">
+                <div class="game-btn" id="btn-WinGo_1M" onclick="selectGame('WinGo_1M', this)">
                     <div class="name">WinGo 1M</div>
                     <div class="time">1 Minute</div>
                 </div>
-                <div class="game-btn" onclick="selectGame('WinGo_3M', this)">
+                <div class="game-btn" id="btn-WinGo_3M" onclick="selectGame('WinGo_3M', this)">
                     <div class="name">WinGo 3M</div>
                     <div class="time">3 Minutes</div>
                 </div>
-                <div class="game-btn" onclick="selectGame('WinGo_5M', this)">
+                <div class="game-btn" id="btn-WinGo_5M" onclick="selectGame('WinGo_5M', this)">
                     <div class="name">WinGo 5M</div>
                     <div class="time">5 Minutes</div>
                 </div>
-                <div class="game-btn" onclick="selectGame('WinGo_10M', this)">
+                <div class="game-btn" id="btn-WinGo_10M" onclick="selectGame('WinGo_10M', this)">
                     <div class="name">WinGo 10M</div>
                     <div class="time">10 Minutes</div>
                 </div>
@@ -849,7 +840,7 @@
             <!-- Issue Countdown Card -->
             <div class="period-card">
                 <div class="period-meta">
-                    <div class="label">Current Issue Period</div>
+                    <div class="label" id="periodGameLabel">Current WinGo 30S Period</div>
                     <div class="issue-number" id="currentIssueNum">Loading...</div>
                 </div>
 
@@ -1005,35 +996,35 @@
             </div>
 
             <div class="api-grid">
-                <!-- 1. get_issue -->
+                <!-- 1. webapi GetNoaverageEmerdList -->
                 <div class="endpoint-card">
                     <div class="endpoint-title">
-                        <span class="method-tag method-get">GET</span>
-                        <span class="endpoint-url">/api/get_issue.php?game=WinGo_1M</span>
+                        <span class="method-tag method-post">POST</span>
+                        <span class="endpoint-url">/api/webapi/GetNoaverageEmerdList</span>
                     </div>
-                    <p class="endpoint-desc">Fetches current & next active lottery period, countdown seconds, and lock state.</p>
-                    <button class="btn-test" onclick="testEndpoint('api/get_issue.php?game=' + currentGame, 'out_issue')">Run Request</button>
-                    <pre id="out_issue" class="code-output">// Response will appear here</pre>
+                    <p class="endpoint-desc">91club / in999 standard historical draw results endpoint.</p>
+                    <button class="btn-test" onclick="testWebAPIHistory()">Test History API</button>
+                    <pre id="out_webapi_history" class="code-output">// Response will appear here</pre>
                 </div>
 
-                <!-- 2. get_history -->
+                <!-- 2. webapi GetGameIssue -->
                 <div class="endpoint-card">
                     <div class="endpoint-title">
-                        <span class="method-tag method-get">GET</span>
-                        <span class="endpoint-url">/api/get_history.php?game=WinGo_1M&limit=10</span>
+                        <span class="method-tag method-post">POST</span>
+                        <span class="endpoint-url">/api/webapi/GetGameIssue</span>
                     </div>
-                    <p class="endpoint-desc">Fetches verified past lottery draw results from your local source of truth database.</p>
-                    <button class="btn-test" onclick="testEndpoint('api/get_history.php?game=' + currentGame + '&limit=5', 'out_history')">Run Request</button>
-                    <pre id="out_history" class="code-output">// Response will appear here</pre>
+                    <p class="endpoint-desc">91club / in999 standard live countdown & period timer endpoint.</p>
+                    <button class="btn-test" onclick="testWebAPIIssue()">Test Timer API</button>
+                    <pre id="out_webapi_issue" class="code-output">// Response will appear here</pre>
                 </div>
 
                 <!-- 3. place_bet -->
                 <div class="endpoint-card">
                     <div class="endpoint-title">
                         <span class="method-tag method-post">POST</span>
-                        <span class="endpoint-url">/api/place_bet.php</span>
+                        <span class="endpoint-url">/api/webapi/WinGoBet</span>
                     </div>
-                    <p class="endpoint-desc">Places a bet atomically with ACID transaction, period lockout, and wallet debiting.</p>
+                    <p class="endpoint-desc">Places a bet atomically with ACID transaction and period lockout.</p>
                     <button class="btn-test" onclick="testPlaceBetAPI()">Test Bet (₹100 on Green)</button>
                     <pre id="out_bet" class="code-output">// Response will appear here</pre>
                 </div>
@@ -1042,88 +1033,35 @@
                 <div class="endpoint-card">
                     <div class="endpoint-title">
                         <span class="method-tag method-get">GET</span>
-                        <span class="endpoint-url">/api/sync.php</span>
+                        <span class="endpoint-url">/api/sync</span>
                     </div>
-                    <p class="endpoint-desc">Fetches draws from external source (or fallback generator) and automatically settles pending bets.</p>
+                    <p class="endpoint-desc">Fetches draws from external provider (ar-lottery01) and automatically settles pending bets.</p>
                     <button class="btn-test" onclick="testEndpoint('api/sync.php', 'out_sync')">Run Sync & Settle</button>
                     <pre id="out_sync" class="code-output">// Response will appear here</pre>
-                </div>
-
-                <!-- 5. diagnostic tester -->
-                <div class="endpoint-card" style="grid-column: 1 / -1;">
-                    <div class="endpoint-title">
-                        <span class="method-tag method-get">GET</span>
-                        <span class="endpoint-url">/api/test_api.php</span>
-                    </div>
-                    <p class="endpoint-desc">System diagnostic suite testing DB integrity, issue calculation, and half-violet math rules.</p>
-                    <button class="btn-test" onclick="testEndpoint('api/test_api.php', 'out_diag')">Run Full Diagnostic Suite</button>
-                    <pre id="out_diag" class="code-output">// Response will appear here</pre>
                 </div>
             </div>
         </div>
 
-        <!-- ==================== TAB 3: DATABASE & CRON ==================== -->
+        <!-- ==================== TAB 3: DATABASE & WEBAPI ==================== -->
         <div id="tab-schema" class="tab-content">
             <div class="data-card" style="padding: 1.5rem;">
-                <h2 style="margin-bottom: 0.5rem;">Production Deployment & Cron Setup</h2>
+                <h2 style="margin-bottom: 0.5rem;">Standard 91Club / In999 Integration URLs</h2>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.25rem;">
-                    Follow these simple steps to deploy on cPanel, Plesk, VPS, or cloud hosting with phpMyAdmin.
+                    Aapki frontend script ko connect karne ke liye ye standard endpoints use karein:
                 </p>
 
-                <h3 style="color: #38bdf8; font-size: 1rem; margin-bottom: 0.5rem;">1. Cron Jobs Configuration</h3>
                 <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; font-size: 0.85rem;">
-                    <p style="margin-bottom: 0.5rem;"><strong>Option A: External Webhook (cron-job.org / EasyCron - Recommended)</strong></p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.25rem;">• Schedule: <code>Every 30 seconds</code> (or 1 minute)</p>
-                    <p style="color: var(--text-secondary); margin-bottom: 0.75rem;">• URL: <code>https://yourdomain.com/api/sync.php</code></p>
+                    <p style="margin-bottom: 0.5rem; color: #38bdf8;"><strong>1. History Endpoint:</strong></p>
+                    <code style="color: #10b981;">POST https://api.devlopedwithzayro.site/api/webapi/GetNoaverageEmerdList</code>
+                    <p style="color: var(--text-secondary); margin-top: 0.25rem;">Payload: <code>{"typeId": 1, "pageSize": 10}</code></p>
                     
-                    <p style="margin-bottom: 0.5rem;"><strong>Option B: Linux / cPanel CLI Cron</strong></p>
-                    <pre style="color: #10b981; font-family: monospace;">* * * * * php /path/to/wingo-api/cron/sync_worker.php >> /path/to/sync.log 2>&1</pre>
+                    <p style="margin: 1rem 0 0.5rem 0; color: #38bdf8;"><strong>2. Timer & Period Endpoint:</strong></p>
+                    <code style="color: #10b981;">POST https://api.devlopedwithzayro.site/api/webapi/GetGameIssue</code>
+                    <p style="color: var(--text-secondary); margin-top: 0.25rem;">Payload: <code>{"typeId": 1}</code></p>
+
+                    <p style="margin: 1rem 0 0.5rem 0; color: #38bdf8;"><strong>3. Bet Place Endpoint:</strong></p>
+                    <code style="color: #10b981;">POST https://api.devlopedwithzayro.site/api/webapi/WinGoBet</code>
                 </div>
-
-                <h3 style="color: #38bdf8; font-size: 1rem; margin-bottom: 0.5rem;">2. Database Schema (MySQL / phpMyAdmin)</h3>
-                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">The complete SQL script is located in <code>schema.sql</code>.</p>
-                <pre class="code-output" style="max-height: 280px;">-- Game configurations
-CREATE TABLE `wingo_games` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `game_code` VARCHAR(50) UNIQUE NOT NULL,
-  `name` VARCHAR(100) NOT NULL,
-  `interval_seconds` INT NOT NULL,
-  `lock_seconds` INT NOT NULL DEFAULT 5,
-  `external_api_url` VARCHAR(255) NOT NULL,
-  `status` TINYINT DEFAULT 1,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Historical results (your source of truth)
-CREATE TABLE `wingo_results` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `game_code` VARCHAR(50) NOT NULL,
-  `issue_number` VARCHAR(50) NOT NULL,
-  `number` TINYINT NOT NULL,
-  `color` VARCHAR(30) NOT NULL,
-  `premium` VARCHAR(50),
-  `sum` INT,
-  `draw_time` DATETIME NOT NULL,
-  `fetched_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY `unique_game_issue` (`game_code`, `issue_number`),
-  INDEX `idx_game_time` (`game_code`, `draw_time`)
-);
-
--- User bets
-CREATE TABLE `wingo_bets` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `user_id` BIGINT NOT NULL,
-  `game_code` VARCHAR(50) NOT NULL,
-  `issue_number` VARCHAR(50) NOT NULL,
-  `bet_type` VARCHAR(20) NOT NULL,
-  `bet_value` VARCHAR(20) NOT NULL,
-  `amount` DECIMAL(12,2) NOT NULL,
-  `odds` DECIMAL(6,2) NOT NULL,
-  `status` ENUM('pending','won','lost','cancelled') DEFAULT 'pending',
-  `payout` DECIMAL(12,2) DEFAULT 0.00,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `settled_at` DATETIME NULL
-);</pre>
             </div>
         </div>
     </main>
@@ -1131,8 +1069,8 @@ CREATE TABLE `wingo_bets` (
     <div id="toast"></div>
 
     <script>
-        // State
-        let currentGame = 'WinGo_1M';
+        // State: Default directly to WinGo_30S on initial page load
+        let currentGame = localStorage.getItem('selected_wingo_game') || 'WinGo_30S';
         let currentUserId = 1001;
         let selectedBetType = null;
         let selectedBetValue = null;
@@ -1142,16 +1080,31 @@ CREATE TABLE `wingo_bets` (
         let activeTableTab = 'history';
         let remainingSeconds = 0;
         let isLocked = false;
-        let pollTimer = null;
 
-        // Init
         document.addEventListener('DOMContentLoaded', () => {
+            // Highlight selected game button
+            document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById('btn-' + currentGame) || document.getElementById('btn-WinGo_30S');
+            if (activeBtn) activeBtn.classList.add('active');
+
+            updatePeriodGameLabel();
             fetchWallet();
             fetchIssueInfo();
             fetchHistory();
             fetchUserBets();
             startPolling();
         });
+
+        function updatePeriodGameLabel() {
+            const names = {
+                'WinGo_30S': 'WinGo 30 Seconds',
+                'WinGo_1M': 'WinGo 1 Minute',
+                'WinGo_3M': 'WinGo 3 Minutes',
+                'WinGo_5M': 'WinGo 5 Minutes',
+                'WinGo_10M': 'WinGo 10 Minutes'
+            };
+            document.getElementById('periodGameLabel').innerText = `Current ${names[currentGame] || currentGame} Period`;
+        }
 
         function switchNav(tabId, el) {
             document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -1162,8 +1115,10 @@ CREATE TABLE `wingo_bets` (
 
         function selectGame(gameCode, el) {
             currentGame = gameCode;
+            localStorage.setItem('selected_wingo_game', gameCode);
             document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('active'));
             el.classList.add('active');
+            updatePeriodGameLabel();
             clearBetSelection();
             fetchIssueInfo();
             fetchHistory();
@@ -1269,7 +1224,6 @@ CREATE TABLE `wingo_bets` (
                     remainingSeconds--;
                     updateCountdownUI();
                 } else {
-                    // Period rolled over! Sync & fetch fresh issue
                     fetchIssueInfo();
                     fetchHistory();
                     fetchUserBets();
@@ -1277,10 +1231,9 @@ CREATE TABLE `wingo_bets` (
                 }
             }, 1000);
 
-            // Background sync poll every 10s
             setInterval(() => {
                 fetchIssueInfo();
-            }, 10000);
+            }, 8000);
         }
 
         // Betting Selection Logic
@@ -1483,18 +1436,50 @@ CREATE TABLE `wingo_bets` (
             }
         }
 
+        async function testWebAPIHistory() {
+            const pre = document.getElementById('out_webapi_history');
+            pre.innerText = 'Sending POST request...';
+            try {
+                const res = await fetch('api/webapi/GetNoaverageEmerdList', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ typeId: (currentGame === 'WinGo_30S' ? 30 : 1), pageSize: 5 })
+                });
+                const json = await res.json();
+                pre.innerText = JSON.stringify(json, null, 2);
+            } catch (e) {
+                pre.innerText = 'Error: ' + e.message;
+            }
+        }
+
+        async function testWebAPIIssue() {
+            const pre = document.getElementById('out_webapi_issue');
+            pre.innerText = 'Sending POST request...';
+            try {
+                const res = await fetch('api/webapi/GetGameIssue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ typeId: (currentGame === 'WinGo_30S' ? 30 : 1) })
+                });
+                const json = await res.json();
+                pre.innerText = JSON.stringify(json, null, 2);
+            } catch (e) {
+                pre.innerText = 'Error: ' + e.message;
+            }
+        }
+
         async function testPlaceBetAPI() {
             const pre = document.getElementById('out_bet');
             pre.innerText = 'Sending POST request...';
             try {
-                const res = await fetch('api/place_bet.php', {
+                const res = await fetch('api/webapi/WinGoBet', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        user_id: currentUserId,
-                        game_code: currentGame,
-                        bet_type: 'color',
-                        bet_value: 'green',
+                        userId: currentUserId,
+                        typeId: (currentGame === 'WinGo_30S' ? 30 : 1),
+                        betType: 'color',
+                        betValue: 'green',
                         amount: 100.0
                     })
                 });
@@ -1507,7 +1492,6 @@ CREATE TABLE `wingo_bets` (
             }
         }
 
-        // Toast Helper
         function showToast(msg) {
             const toast = document.getElementById('toast');
             toast.innerText = msg;
