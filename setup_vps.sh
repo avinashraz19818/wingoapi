@@ -54,7 +54,6 @@ FLUSH PRIVILEGES;
 
 DB_CONFIGURED=0
 
-# Try Ubuntu/Debian system maintenance credentials (bypasses root password completely)
 if [ -f /etc/mysql/debian.cnf ] && mysql --defaults-file=/etc/mysql/debian.cnf -e "$SQL_COMMANDS" 2>/dev/null; then
     echo "[+] Database configured via debian.cnf system maintenance credentials."
     DB_CONFIGURED=1
@@ -99,7 +98,7 @@ sed -i "s|API_DOMAIN=.*|API_DOMAIN=${DOMAIN}|g" "${INSTALL_DIR}/.env" 2>/dev/nul
 chown -R www-data:www-data "${INSTALL_DIR}"
 chmod -R 755 "${INSTALL_DIR}"
 
-# 6. Configure Nginx
+# 6. Configure Nginx (Clean CORS without duplication)
 echo "[+] Step 6: Configuring Nginx VirtualHost..."
 cat << 'EOF' > "/etc/nginx/sites-available/${DOMAIN}.conf"
 server {
@@ -112,10 +111,6 @@ server {
 
     access_log /var/log/nginx/wingo_api_access.log;
     error_log /var/log/nginx/wingo_api_error.log;
-
-    add_header 'Access-Control-Allow-Origin' '*' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-    add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
@@ -172,10 +167,7 @@ systemctl restart wingo-worker
 
 echo "================================================================="
 echo "   ✅ Deployment Complete!"
-echo "   API Domain: http://${DOMAIN}"
+echo "   API Domain: https://${DOMAIN}"
 echo "   Worker Status: Active (Running 24/7)"
-echo "   Check health: curl http://${DOMAIN}/api/health"
-echo ""
-echo "   👉 To Activate Free SSL Certificate, run:"
-echo "   sudo certbot --nginx -d ${DOMAIN}"
+echo "   Check health: curl https://${DOMAIN}/api/health"
 echo "================================================================="

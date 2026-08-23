@@ -1,17 +1,27 @@
 <?php
 /**
- * Shared API Helper: Headers, CORS, and Uniform JSON Responses
+ * Shared API Helper: Dynamic CORS, Headers, and Uniform JSON Responses
  */
 
 declare(strict_types=1);
 
-// Enable CORS for frontend integration
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-header('Content-Type: application/json; charset=utf-8');
+// Prevent header duplication & dynamically allow origin (supports https://in999.club9.eu.cc)
+if (!headers_sent()) {
+    if (!empty($_SERVER['HTTP_ORIGIN'])) {
+        header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+        header('Access-Control-Allow-Credentials: true');
+    } else {
+        header('Access-Control-Allow-Origin: *');
+    }
+    
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Token,token,authorization,x-token,X-Token,Accept,Origin,x-auth-token');
+    header('Access-Control-Max-Age: 86400');
+    header('Content-Type: application/json; charset=utf-8');
+}
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+// Handle preflight OPTIONS requests immediately
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
@@ -25,7 +35,7 @@ function jsonSuccess(mixed $data = null, string $message = 'Success', int $code 
         'msg' => $message,
         'data' => $data,
         'time' => date('Y-m-d H:i:s')
-    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -42,7 +52,7 @@ function jsonError(string $message = 'Error', int $code = 1, int $httpStatus = 4
     if ($extra !== null) {
         $response['details'] = $extra;
     }
-    echo json_encode($response, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
