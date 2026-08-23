@@ -116,7 +116,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Derive issue number dynamically
+        // Current issue = EXACTLY the latest drawn issue number from external result!
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -181,6 +181,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
+        // Active issue is EXACTLY the latest drawn issue
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -206,7 +207,7 @@ class ResultSyncService {
     }
 
     /**
-     * Derive active issue number cleanly based on latest drawn issue from database
+     * Derive active issue number: Returns EXACTLY the latest drawn result from the external API!
      */
     private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs): string {
         $stmt = $this->pdo->prepare("
@@ -219,26 +220,15 @@ class ResultSyncService {
         $stmt->execute([$gameCode]);
         $latest = $stmt->fetch();
 
-        // Offset setting: 
-        // 0 = Exact next upcoming period (lastSeq + 1)
-        // -1 = 1 Period Piche (lastSeq)
-        // -2 = 2 Periods Piche (lastSeq - 1)
-        $offset = (int)ISSUE_OFFSET;
-
-        if ($latest && strlen($latest['issue_number']) >= 10) {
-            $latestIssue = (string)$latest['issue_number'];
-            $prefix = substr($latestIssue, 0, -4);
-            $lastSeq = (int)substr($latestIssue, -4);
-
-            $activeSeq = $lastSeq + 1 + $offset;
-            return $prefix . sprintf('%04d', max(1, $activeSeq));
+        if ($latest && !empty($latest['issue_number'])) {
+            return (string)$latest['issue_number'];
         }
 
         return $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);
     }
 
     /**
-     * Derive next issue number from active issue string
+     * Derive next issue number (Active issue + 1)
      */
     private function deriveNextIssueNumber(string $currentIssue): string {
         if (strlen($currentIssue) >= 10) {
