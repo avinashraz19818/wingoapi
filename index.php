@@ -12,8 +12,9 @@ require_once __DIR__ . '/api/common.php';
 $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $uri = rtrim($uri, '/');
 
-// 1. Standard 91Club / in999 / Daman / BDG WebAPI endpoints: /api/webapi/*
-if (str_starts_with($uri, '/api/webapi')) {
+// 1. Universal In999 / 91Club / Daman WebAPI routes
+// Matches /api/webapi/*, /webapi/*, /deepanshu/api/webapi/*
+if (preg_match('#/(?:deepanshu/)?(?:api/)?webapi(?:/|$)#i', $uri)) {
     require __DIR__ . '/api/webapi_controller.php';
     exit;
 }
@@ -45,20 +46,19 @@ if ($uri === '' || $uri === '/' || $uri === '/health' || $uri === '/api/health')
         'system' => 'WinGo Automated Lottery & Betting API Engine',
         'domain' => getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site',
         'status' => 'ONLINE',
-        'version' => '2.6.0',
-        'frontend_app' => 'https://' . (getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site') . '/index.html',
-        'server_time' => date('Y-m-d H:i:s'),
+        'version' => '3.0.0',
         'webapi_endpoints' => [
-            'POST/GET https://api.devlopedwithzayro.site/api/webapi/GetNoaverageEmerdList' => 'History list (91club / in999 standard)',
-            'POST/GET https://api.devlopedwithzayro.site/api/webapi/GetGameIssue' => 'Active period & countdown',
-            'POST     https://api.devlopedwithzayro.site/api/webapi/WinGoBet' => 'Place user bet',
-            'POST/GET https://api.devlopedwithzayro.site/api/webapi/GetMyEmerdList' => 'User bet history'
+            '1. History Endpoint' => 'POST /api/webapi/GetNoaverageEmerdList  Payload: {"typeId": 1, "pageSize": 10}',
+            '2. Timer & Period'   => 'POST /api/webapi/GetGameIssue           Payload: {"typeId": 1}',
+            '3. Bet Place'        => 'POST /api/webapi/WinGoBet               Payload: {"typeId": 1, "selectType": "green", "amount": 10}',
+            '4. Bet History'      => 'POST /api/webapi/GetMyEmerdList         Payload: {"typeId": 1, "userId": 1001}'
         ],
         'rest_endpoints' => [
-            'GET  /api/issue?game=WinGo_1M' => 'Current issue & timer',
-            'GET  /api/history?game=WinGo_1M&limit=50' => 'Draw results history',
+            'GET /api/issue?game=WinGo_1M' => 'Current issue & timer',
+            'GET /api/history?game=WinGo_1M&limit=50' => 'Draw results history',
             'POST /api/bet' => 'Place bet'
-        ]
+        ],
+        'server_time' => date('Y-m-d H:i:s')
     ], 'WinGo API is operational');
 }
 
