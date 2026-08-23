@@ -1,12 +1,6 @@
 <?php
 /**
  * 91Club / In999 / Daman Universal WebAPI Controller
- * 
- * Endpoints:
- * 1. POST /api/webapi/GetNoaverageEmerdList (Payload: {"typeId": 2, "pageSize": 10})
- * 2. POST /api/webapi/GetGameIssue (Payload: {"typeId": 2})
- * 3. POST /api/webapi/WinGoBet (Payload: {"typeId": 2, "issueNumber": "...", "selectType": "...", "amount": 10})
- * 4. POST /api/webapi/GetMyEmerdList (User Bet History)
  */
 
 declare(strict_types=1);
@@ -36,7 +30,7 @@ function resolveGameCode(mixed $typeId, mixed $gameParam): string {
 
     $t = is_numeric($typeId) ? (int)$typeId : 2;
     return match ($t) {
-        1, 30, 0 => 'WinGo_30S',  // 1 or 30 = 30 Seconds
+        1, 30, 0 => 'WinGo_30S',  // 1, 30, 0 = 30 Seconds
         2        => 'WinGo_1M',   // 2 = 1 Minute
         3        => 'WinGo_3M',   // 3 = 3 Minutes
         4        => 'WinGo_5M',   // 4 = 5 Minutes
@@ -129,12 +123,9 @@ switch (strtolower($action)) {
     case 'getissue':
     case 'issue':
         $issue = $syncService->getCurrentIssue($gameCode);
-        $startTs = strtotime($issue['start_time']);
-        $endTs = strtotime($issue['end_time']);
-        $nowTs = time();
 
-        // 91club frontend expects timestamps in milliseconds (e.g. 1787482560000)
-        // so that parseInt(t.startTime / 1e3) parses correctly into seconds!
+        // In999 JavaScript explicitly executes: .serviceTime.replace(/-/g, "/") and .startTime.replace(/-/g, "/")
+        // Therefore, serviceTime and startTime MUST be date strings formatted as 'YYYY-MM-DD HH:MM:SS'!
         echo json_encode([
             'code' => 0,
             'msg' => 'success',
@@ -144,14 +135,14 @@ switch (strtolower($action)) {
                 'issueNumber'       => (string)$issue['issue_number'],
                 'issue_number'      => (string)$issue['issue_number'],
                 'nextIssueNumber'   => (string)$issue['next_issue_number'],
-                'startTime'         => $startTs * 1000,
-                'endTime'           => $endTs * 1000,
-                'openTime'          => $endTs * 1000,
-                'serviceTime'       => $nowTs * 1000,
+                'startTime'         => (string)$issue['start_time'],
+                'endTime'           => (string)$issue['end_time'],
+                'openTime'          => (string)$issue['end_time'],
+                'serviceTime'       => date('Y-m-d H:i:s'),
                 'seconds'           => (int)$issue['seconds_left'],
                 'secondsLeft'       => (int)$issue['seconds_left'],
                 'interval'          => (int)$issue['interval'],
-                'intervalM'         => round($issue['interval'] / 60, 1),
+                'intervalM'         => (float)($issue['interval'] == 30 ? 0.5 : round($issue['interval'] / 60, 1)),
                 'isLocked'          => (bool)$issue['is_locked'],
                 'typeId'            => (int)$typeId,
                 'serverTime'        => $issue['server_time'],
@@ -226,7 +217,6 @@ switch (strtolower($action)) {
         echo json_encode([
             'code' => 0,
             'msg' => 'success',
-            'msgCode' => 0,
             'data' => ['list' => $history]
         ], JSON_UNESCAPED_UNICODE);
         exit;
