@@ -1,18 +1,28 @@
 #!/usr/bin/env bash
 set -e
 
-echo "[+] Step 1: Scanning /etc/nginx/sites-available for existing configs..."
+echo "[+] Step 1: Cleaning sites-enabled and enabling active production domains..."
+rm -f /etc/nginx/sites-enabled/*
 
-# Re-enable all available sites in /etc/nginx/sites-available/
-for conf in /etc/nginx/sites-available/*; do
-    if [ -f "$conf" ]; then
-        filename=$(basename "$conf")
-        echo "Enabling site: $filename"
-        ln -sf "$conf" "/etc/nginx/sites-enabled/$filename"
-    fi
-done
+# Enable Main Domain
+if [ -f "/etc/nginx/sites-available/devlopedwithzayro.site" ]; then
+    ln -sf "/etc/nginx/sites-available/devlopedwithzayro.site" "/etc/nginx/sites-enabled/devlopedwithzayro.site"
+    echo "Enabling devlopedwithzayro.site"
+fi
 
-echo "[+] Step 2: Ensuring api.devlopedwithzayro.site is strictly bound to its own server_name..."
+# Enable Protector subdomain if exists
+if [ -f "/etc/nginx/sites-available/protector.devlopedwithzayro.site" ]; then
+    ln -sf "/etc/nginx/sites-available/protector.devlopedwithzayro.site" "/etc/nginx/sites-enabled/protector.devlopedwithzayro.site"
+    echo "Enabling protector.devlopedwithzayro.site"
+fi
+
+# Enable Neura AI if valid
+if [ -f "/etc/nginx/sites-available/neura-ai" ]; then
+    ln -sf "/etc/nginx/sites-available/neura-ai" "/etc/nginx/sites-enabled/neura-ai"
+    echo "Enabling neura-ai"
+fi
+
+echo "[+] Step 2: Configuring api.devlopedwithzayro.site..."
 cat << 'EOF' > "/etc/nginx/sites-available/api.devlopedwithzayro.site.conf"
 # HTTP
 server {
@@ -80,9 +90,9 @@ ln -sf "/etc/nginx/sites-available/api.devlopedwithzayro.site.conf" "/etc/nginx/
 echo "[+] Step 3: Testing Nginx syntax..."
 nginx -t
 
-echo "[+] Step 4: Restarting Nginx & PHP..."
+echo "[+] Step 4: Restarting Nginx..."
 systemctl restart nginx php8.3-fpm
 
 echo "=========================================================="
-echo "  ✅ Main Domain & Subdomain separation fixed!"
+echo "  ✅ Main Domain (devlopedwithzayro.site) & Subdomain (api.devlopedwithzayro.site) both LIVE!"
 echo "=========================================================="
