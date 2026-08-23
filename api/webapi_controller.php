@@ -28,13 +28,13 @@ function resolveGameCode(mixed $typeId, mixed $gameParam): string {
         if ($g === '10m' || $g === '10M') return 'WinGo_10M';
     }
 
-    $t = is_numeric($typeId) ? (int)$typeId : 2;
+    $t = is_numeric($typeId) ? (int)$typeId : 1;
     return match ($t) {
-        1, 30, 0 => 'WinGo_30S',  // 1, 30, 0 = 30 Seconds
-        2        => 'WinGo_1M',   // 2 = 1 Minute
-        3        => 'WinGo_3M',   // 3 = 3 Minutes
-        4        => 'WinGo_5M',   // 4 = 5 Minutes
-        5, 10    => 'WinGo_10M',  // 5 = 10 Minutes
+        1        => 'WinGo_1M',   // 1 = 1 Minute
+        2        => 'WinGo_3M',   // 2 = 3 Minutes
+        3        => 'WinGo_5M',   // 3 = 5 Minutes
+        4, 30, 0 => 'WinGo_30S',  // 4, 30, 0 = 30 Seconds
+        5, 10    => 'WinGo_10M',  // 5, 10 = 10 Minutes
         default  => 'WinGo_1M'
     };
 }
@@ -48,9 +48,9 @@ function parseBetTypeAndValue(mixed $selectType, mixed $betType, mixed $betValue
     
     if (is_int($st)) {
         if ($st >= 0 && $st <= 9) return ['number', (string)$st];
-        if ($st === 10) return ['color', 'green'];
-        if ($st === 11) return ['color', 'violet'];
-        if ($st === 12) return ['color', 'red'];
+        if ($st === 10) return ['color', 'red'];
+        if ($st === 11) return ['color', 'green'];
+        if ($st === 12) return ['color', 'violet'];
         if ($st === 13) return ['big_small', 'big'];
         if ($st === 14) return ['big_small', 'small'];
         if ($st === 15) return ['odd_even', 'odd'];
@@ -65,7 +65,7 @@ function parseBetTypeAndValue(mixed $selectType, mixed $betType, mixed $betValue
     return ['color', 'green'];
 }
 
-$typeId = $payload['typeId'] ?? $payload['typeid'] ?? $_GET['typeid'] ?? $_GET['typeId'] ?? 2;
+$typeId = $payload['typeId'] ?? $payload['typeid'] ?? $_GET['typeid'] ?? $_GET['typeId'] ?? 1;
 $gameCode = resolveGameCode($typeId, $payload['game_code'] ?? $payload['game'] ?? $_GET['game'] ?? null);
 $pageSize = (int)($payload['pageSize'] ?? $payload['pagesize'] ?? $_GET['pageSize'] ?? $_GET['limit'] ?? 10);
 
@@ -106,7 +106,7 @@ switch (strtolower($action)) {
 
         echo json_encode([
             'code' => 0,
-            'msg' => 'success',
+            'msg' => 'Succeed',
             'msgCode' => 0,
             'serviceNowTime' => date('Y-m-d H:i:s'),
             'data' => [
@@ -130,7 +130,7 @@ switch (strtolower($action)) {
         // Therefore, serviceTime and startTime MUST be date strings formatted as 'YYYY-MM-DD HH:MM:SS'!
         echo json_encode([
             'code' => 0,
-            'msg' => 'success',
+            'msg' => 'Succeed',
             'msgCode' => 0,
             'serviceNowTime' => date('Y-m-d H:i:s'),
             'data' => [
@@ -182,15 +182,19 @@ switch (strtolower($action)) {
             $num = (int)$row['number'];
             echo json_encode([
                 'code' => 0,
-                'msg' => 'success',
+                'msg' => 'Succeed',
                 'msgCode' => 0,
                 'data' => [
-                    'issueNumber' => (string)$row['issue_number'],
-                    'number'      => (string)$num,
-                    'colour'      => (string)$row['color'],
-                    'color'       => (string)$row['color'],
-                    'drawTime'    => (string)$row['draw_time'],
-                    'typeId'      => (int)$typeId
+                    [
+                        'issueNumber' => (string)$row['issue_number'],
+                        'number'      => (string)$num,
+                        'colour'      => (string)$row['color'],
+                        'color'       => (string)$row['color'],
+                        'drawTime'    => (string)$row['draw_time'],
+                        'typeId'      => (int)$typeId,
+                        'winAmount'   => 0,
+                        'state'       => -1
+                    ]
                 ]
             ], JSON_UNESCAPED_UNICODE);
         } else {
@@ -202,8 +206,9 @@ switch (strtolower($action)) {
         }
         exit;
 
-    // 4. Bet Place Endpoint: POST /api/webapi/WinGoBet
+    // 4. Bet Place Endpoint: POST /api/webapi/WinGoBet & GameBetting
     case 'wingobet':
+    case 'gamebetting':
     case 'bet':
     case 'placebet':
     case 'betting':
@@ -219,7 +224,7 @@ switch (strtolower($action)) {
             $receipt = $betService->placeBet($userId, $gameCode, $betType, $betValue, $amount);
             echo json_encode([
                 'code' => 0,
-                'msg' => 'Bet placed successfully',
+                'msg' => 'Succeed',
                 'msgCode' => 0,
                 'data' => [
                     'betId' => $receipt['bet_id'],
@@ -232,7 +237,7 @@ switch (strtolower($action)) {
                 ]
             ], JSON_UNESCAPED_UNICODE);
         } catch (Throwable $e) {
-            http_response_code(400);
+            http_response_code(200);
             echo json_encode([
                 'code' => 1,
                 'msg' => $e->getMessage(),
@@ -249,7 +254,7 @@ switch (strtolower($action)) {
         $bets = $betService->getUserBets($userId, $gameCode, $pageSize);
         echo json_encode([
             'code' => 0,
-            'msg' => 'success',
+            'msg' => 'Succeed',
             'msgCode' => 0,
             'data' => [
                 'list' => $bets,
@@ -260,11 +265,58 @@ switch (strtolower($action)) {
         ], JSON_UNESCAPED_UNICODE);
         exit;
 
+    // 6. Type List: POST /api/webapi/GetTypeList
+    case 'gettypelist':
+        echo json_encode([
+            'code' => 0,
+            'msg' => 'Succeed',
+            'msgCode' => 0,
+            'serviceNowTime' => date('Y-m-d H:i:s'),
+            'data' => [
+                ['typeID' => 4, 'typeName' => 'Win 30s', 'intervalM' => 0.5, 'scope' => '1|10|100|1000', 'betMultiple' => '1|5|10|20|50|100', 'sort' => 4],
+                ['typeID' => 1, 'typeName' => 'Win 1 minute', 'intervalM' => 1, 'scope' => '1|10|100|1000', 'betMultiple' => '1|5|10|20|50|100', 'sort' => 3],
+                ['typeID' => 2, 'typeName' => 'Win 3 minute', 'intervalM' => 3, 'scope' => '1|10|100|1000', 'betMultiple' => '1|5|10|20|50|100', 'sort' => 2],
+                ['typeID' => 3, 'typeName' => 'Win 5 minute', 'intervalM' => 5, 'scope' => '1|10|100|1000', 'betMultiple' => '1|5|10|20|50|100', 'sort' => 1],
+            ]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+
+    // 7. Client & External Sync: POST /api/webapi/sync_draw
+    case 'sync_draw':
+    case 'sync':
+        $list = $payload['list'] ?? ($payload['data']['list'] ?? []);
+        if (empty($list) && isset($payload['issueNumber']) && isset($payload['number'])) {
+            $list = [$payload];
+        }
+        $saved = 0;
+        foreach ($list as $item) {
+            $normalized = (new ExternalLotteryAPI())->normalizeResult($item, $gameCode);
+            $stmt = $pdo->prepare("INSERT IGNORE INTO wingo_results (game_code, issue_number, number, color, premium, sum, draw_time) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $normalized['game_code'],
+                $normalized['issue_number'],
+                $normalized['number'],
+                $normalized['color'],
+                $normalized['premium'],
+                $normalized['sum'],
+                $normalized['draw_time']
+            ]);
+            if ($stmt->rowCount() > 0) $saved++;
+        }
+        $syncService->updateCurrentIssue($gameCode);
+        echo json_encode([
+            'code' => 0,
+            'msg' => "Synced {$saved} draws successfully",
+            'msgCode' => 0,
+            'synced_count' => $saved
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+
     default:
         $history = $syncService->getHistory($gameCode, $pageSize);
         echo json_encode([
             'code' => 0,
-            'msg' => 'success',
+            'msg' => 'Succeed',
             'data' => ['list' => $history]
         ], JSON_UNESCAPED_UNICODE);
         exit;
