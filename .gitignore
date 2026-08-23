@@ -1,0 +1,19 @@
+# Environment & sensitive credentials
+.env
+
+# Database & SQLite files
+data/*.sqlite
+data/*.sqlite-journal
+data/*.sqlite-wal
+data/*.sqlite-shm
+*.db
+*.sqlite
+
+# Logs
+*.log
+cron/*.log
+
+# IDEs & System
+.DS_Store
+.idea/
+.vscode/
