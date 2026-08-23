@@ -116,7 +116,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Current active issue is the top drawn issue
+        // Current active issue is the period currently open for betting (latest finished draw + 1)
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -181,7 +181,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Current active betting issue
+        // Current active betting issue is the next issue after the latest completed draw
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -207,7 +207,7 @@ class ResultSyncService {
     }
 
     /**
-     * Active issue is the latest drawn issue from external provider
+     * Active issue is the period open for betting (Latest completed draw + 1)
      */
     private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs): string {
         $stmt = $this->pdo->prepare("
@@ -221,16 +221,16 @@ class ResultSyncService {
         $latest = $stmt->fetch();
 
         if ($latest && !empty($latest['issue_number'])) {
-            return (string)$latest['issue_number'];
+            return $this->deriveNextIssueNumber((string)$latest['issue_number']);
         }
 
         return $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);
     }
 
     /**
-     * Derive next issue number (Active issue + 1)
+     * Derive next issue number (Increment sequence by 1)
      */
-    private function deriveNextIssueNumber(string $currentIssue): string {
+    public function deriveNextIssueNumber(string $currentIssue): string {
         if (strlen($currentIssue) >= 10) {
             $prefix = substr($currentIssue, 0, -4);
             $seq = (int)substr($currentIssue, -4);
@@ -241,13 +241,12 @@ class ResultSyncService {
 
     /**
      * Get historical draw results:
-     * Offsets by 1 to hide the current active/in-progress issue from history
-     * so history only shows completed/previous periods.
+     * Returns all finished draws in reverse chronological order.
+     * Active open period is never included in history.
      */
     public function getHistory(string $gameCode, int $limit = 50): array {
         $limit = max(1, min(200, $limit));
 
-        // Query with OFFSET 1 to display finished past draws
         $stmt = $this->pdo->prepare("
             SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
             FROM wingo_results 
@@ -259,23 +258,6 @@ class ResultSyncService {
         $stmt->bindValue(2, $limit, PDO::PARAM_INT);
         $stmt->execute();
         
-        $history = $stmt->fetchAll();
-
-        // If less than 2 records in DB, return standard list
-        if (empty($history)) {
-            $stmt = $this->pdo->prepare("
-                SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
-                FROM wingo_results 
-                WHERE game_code = ? 
-                ORDER BY id DESC 
-                LIMIT ?
-            ");
-            $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
-            $stmt->bindValue(2, $limit, PDO::PARAM_INT);
-            $stmt->execute();
-            $history = $stmt->fetchAll();
-        }
-
-        return $history;
+        return $stmt->fetchAll();
     }
 }
