@@ -3,9 +3,9 @@
  * 91Club / In999 / Daman Universal WebAPI Controller
  * 
  * Endpoints:
- * 1. POST /api/webapi/GetNoaverageEmerdList (Payload: {"typeId": 1, "pageSize": 10})
- * 2. POST /api/webapi/GetGameIssue (Payload: {"typeId": 1})
- * 3. POST /api/webapi/WinGoBet (Payload: {"typeId": 1, "issueNumber": "...", "selectType": "...", "amount": 10})
+ * 1. POST /api/webapi/GetNoaverageEmerdList (Payload: {"typeId": 2, "pageSize": 10})
+ * 2. POST /api/webapi/GetGameIssue (Payload: {"typeId": 2})
+ * 3. POST /api/webapi/WinGoBet (Payload: {"typeId": 2, "issueNumber": "...", "selectType": "...", "amount": 10})
  * 4. POST /api/webapi/GetMyEmerdList (User Bet History)
  */
 
@@ -22,26 +22,26 @@ $betService = new BetService($pdo);
 
 $payload = getRequestPayload();
 
-// Helper to map typeId to gameCode
+// Helper to map In999 typeId to standard gameCode
 function resolveGameCode(mixed $typeId, mixed $gameParam): string {
     if (!empty($gameParam)) {
         $g = (string)$gameParam;
         if (str_starts_with(strtolower($g), 'wingo_')) return $g;
         if ($g === '30s' || $g === '30S' || $g === '30') return 'WinGo_30S';
-        if ($g === '1m' || $g === '1M' || $g === '1') return 'WinGo_1M';
-        if ($g === '3m' || $g === '3M' || $g === '3') return 'WinGo_3M';
-        if ($g === '5m' || $g === '5M' || $g === '5') return 'WinGo_5M';
-        if ($g === '10m' || $g === '10M' || $g === '10') return 'WinGo_10M';
+        if ($g === '1m' || $g === '1M') return 'WinGo_1M';
+        if ($g === '3m' || $g === '3M') return 'WinGo_3M';
+        if ($g === '5m' || $g === '5M') return 'WinGo_5M';
+        if ($g === '10m' || $g === '10M') return 'WinGo_10M';
     }
 
-    $t = is_numeric($typeId) ? (int)$typeId : 1;
+    $t = is_numeric($typeId) ? (int)$typeId : 2;
     return match ($t) {
-        30, 0 => 'WinGo_30S',
-        1     => 'WinGo_1M',
-        2, 3  => 'WinGo_3M',
-        4, 10 => 'WinGo_10M',
-        5     => 'WinGo_5M',
-        default => 'WinGo_1M'
+        1, 30, 0 => 'WinGo_30S',  // 1 or 30 = 30 Seconds
+        2        => 'WinGo_1M',   // 2 = 1 Minute
+        3        => 'WinGo_3M',   // 3 = 3 Minutes
+        4        => 'WinGo_5M',   // 4 = 5 Minutes
+        5, 10    => 'WinGo_10M',  // 5 = 10 Minutes
+        default  => 'WinGo_1M'
     };
 }
 
@@ -71,7 +71,7 @@ function parseBetTypeAndValue(mixed $selectType, mixed $betType, mixed $betValue
     return ['color', 'green'];
 }
 
-$typeId = $payload['typeId'] ?? $payload['typeid'] ?? $_GET['typeid'] ?? $_GET['typeId'] ?? 1;
+$typeId = $payload['typeId'] ?? $payload['typeid'] ?? $_GET['typeid'] ?? $_GET['typeId'] ?? 2;
 $gameCode = resolveGameCode($typeId, $payload['game_code'] ?? $payload['game'] ?? $_GET['game'] ?? null);
 $pageSize = (int)($payload['pageSize'] ?? $payload['pagesize'] ?? $_GET['pageSize'] ?? $_GET['limit'] ?? 10);
 
@@ -93,8 +93,8 @@ switch (strtolower($action)) {
             $list[] = [
                 'issueNumber'  => (string)$row['issue_number'],
                 'issue_number' => (string)$row['issue_number'],
-                'number'       => $num,
-                'drawNumber'   => $num,
+                'number'       => (string)$num,
+                'drawNumber'   => (string)$num,
                 'colour'       => (string)$row['color'],
                 'color'        => (string)$row['color'],
                 'premium'      => (string)($row['premium'] ?? $num),
@@ -144,6 +144,7 @@ switch (strtolower($action)) {
                 'seconds'           => (int)$issue['seconds_left'],
                 'secondsLeft'       => (int)$issue['seconds_left'],
                 'interval'          => (int)$issue['interval'],
+                'intervalM'         => round($issue['interval'] / 60, 1),
                 'isLocked'          => (bool)$issue['is_locked'],
                 'typeId'            => (int)$typeId,
                 'serverTime'        => $issue['server_time'],
