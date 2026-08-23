@@ -116,7 +116,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Current active issue is the period currently open for betting (latest finished draw + 1)
+        // Current active issue is the top drawn issue (1-period offset for pre-fetched instant results)
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -181,7 +181,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Current active betting issue is the next issue after the latest completed draw
+        // Current active betting issue is the latest drawn issue
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -207,7 +207,7 @@ class ResultSyncService {
     }
 
     /**
-     * Active issue is the period open for betting (Latest completed draw + 1)
+     * Active issue is the latest drawn issue from external provider
      */
     private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs): string {
         $stmt = $this->pdo->prepare("
@@ -221,7 +221,7 @@ class ResultSyncService {
         $latest = $stmt->fetch();
 
         if ($latest && !empty($latest['issue_number'])) {
-            return $this->deriveNextIssueNumber((string)$latest['issue_number']);
+            return (string)$latest['issue_number'];
         }
 
         return $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);
@@ -241,23 +241,57 @@ class ResultSyncService {
 
     /**
      * Get historical draw results:
-     * Returns all finished draws in reverse chronological order.
-     * Active open period is never included in history.
+     * Only returns completed past draws (issue_number < activeIssue).
+     * The active period currently open for betting is strictly hidden from history.
      */
-    public function getHistory(string $gameCode, int $limit = 50): array {
+    public function getHistory(string $gameCode, int $limit = 50, ?string $activeIssue = null): array {
         $limit = max(1, min(200, $limit));
 
+        if (!empty($activeIssue)) {
+            $stmt = $this->pdo->prepare("
+                SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
+                FROM wingo_results 
+                WHERE game_code = ? AND issue_number < ?
+                ORDER BY id DESC 
+                LIMIT ?
+            ");
+            $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
+            $stmt->bindValue(2, $activeIssue, PDO::PARAM_STR);
+            $stmt->bindValue(3, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $history = $stmt->fetchAll();
+            if (!empty($history)) {
+                return $history;
+            }
+        }
+
+        // Fallback: OFFSET 1 to hide the active top record
         $stmt = $this->pdo->prepare("
             SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
             FROM wingo_results 
             WHERE game_code = ? 
             ORDER BY id DESC 
-            LIMIT ?
+            LIMIT ? OFFSET 1
         ");
         $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
         $stmt->bindValue(2, $limit, PDO::PARAM_INT);
         $stmt->execute();
-        
-        return $stmt->fetchAll();
+        $history = $stmt->fetchAll();
+
+        if (empty($history)) {
+            $stmt = $this->pdo->prepare("
+                SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
+                FROM wingo_results 
+                WHERE game_code = ? 
+                ORDER BY id DESC 
+                LIMIT ?
+            ");
+            $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
+            $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $history = $stmt->fetchAll();
+        }
+
+        return $history;
     }
 }
