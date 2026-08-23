@@ -1,6 +1,6 @@
 <?php
 /**
- * Database Connection & Initialization Helper
+ * Database Connection Helper (MySQL with automatic SQLite dev fallback)
  */
 
 declare(strict_types=1);
@@ -12,8 +12,9 @@ class DB {
 
     public static function getConnection(): PDO {
         if (self::$instance === null) {
-            try {
-                if (DB_TYPE === 'mysql') {
+            $dbType = DB_TYPE;
+            if ($dbType === 'mysql') {
+                try {
                     $dsn = sprintf(
                         'mysql:host=%s;port=%s;dbname=%s;charset=%s',
                         DB_HOST,
@@ -25,38 +26,47 @@ class DB {
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                         PDO::ATTR_EMULATE_PREPARES => false,
+                        PDO::ATTR_TIMEOUT => 2
                     ]);
-                } else {
-                    // SQLite for local sandbox / quick testing
-                    $dbPath = SQLITE_FILE;
-                    $isNew = !file_exists($dbPath);
-                    self::$instance = new PDO('sqlite:' . $dbPath, null, null, [
-                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    ]);
-                    // Enable WAL mode & foreign keys for SQLite
-                    self::$instance->exec("PRAGMA journal_mode = WAL;");
-                    self::$instance->exec("PRAGMA foreign_keys = ON;");
-
-                    if ($isNew) {
-                        self::initSQLiteSchema(self::$instance);
+                } catch (PDOException $e) {
+                    // In development/sandbox environments, fallback to SQLite automatically
+                    if (!getenv('STRICT_MYSQL')) {
+                        self::$instance = self::createSQLiteInstance();
+                    } else {
+                        http_response_code(500);
+                        header('Content-Type: application/json');
+                        echo json_encode([
+                            'code' => 500,
+                            'msg' => 'MySQL Connection Failed: ' . $e->getMessage()
+                        ]);
+                        exit;
                     }
                 }
-            } catch (PDOException $e) {
-                // If MySQL connection fails, return JSON error or throw
-                if (php_sapi_name() === 'cli') {
-                    die("Database connection failed: " . $e->getMessage() . "\n");
-                }
-                http_response_code(500);
-                header('Content-Type: application/json');
-                echo json_encode([
-                    'code' => 500,
-                    'msg' => 'Database connection failed: ' . $e->getMessage()
-                ]);
-                exit;
+            } else {
+                self::$instance = self::createSQLiteInstance();
             }
         }
         return self::$instance;
+    }
+
+    private static function createSQLiteInstance(): PDO {
+        $dbPath = SQLITE_FILE;
+        $dir = dirname($dbPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        $isNew = !file_exists($dbPath);
+        $pdo = new PDO('sqlite:' . $dbPath, null, null, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        $pdo->exec("PRAGMA journal_mode = WAL;");
+        $pdo->exec("PRAGMA foreign_keys = ON;");
+
+        if ($isNew || filesize($dbPath) === 0) {
+            self::initSQLiteSchema($pdo);
+        }
+        return $pdo;
     }
 
     public static function initSQLiteSchema(PDO $pdo): void {
@@ -66,6 +76,7 @@ class DB {
             game_code TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
             interval_seconds INTEGER NOT NULL,
+            lock_seconds INTEGER DEFAULT 5,
             external_api_url TEXT NOT NULL,
             status INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -83,7 +94,6 @@ class DB {
             fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (game_code, issue_number)
         );
-        CREATE INDEX IF NOT EXISTS idx_game_time ON wingo_results(game_code, draw_time);
 
         CREATE TABLE IF NOT EXISTS wingo_current_issue (
             game_code TEXT PRIMARY KEY,
@@ -110,10 +120,7 @@ class DB {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             settled_at DATETIME NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_user_game_issue ON wingo_bets(user_id, game_code, issue_number);
-        CREATE INDEX IF NOT EXISTS idx_issue_status ON wingo_bets(issue_number, status);
 
-        -- User wallet table (matching shonu_kaichila)
         CREATE TABLE IF NOT EXISTS shonu_kaichila (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             balakedara INTEGER UNIQUE NOT NULL,
@@ -121,15 +128,13 @@ class DB {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
-        -- Insert initial game configs
-        INSERT OR IGNORE INTO wingo_games (game_code, name, interval_seconds, external_api_url) VALUES
-        ('WinGo_30S', 'WinGo 30 Seconds', 30, 'https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json'),
-        ('WinGo_1M', 'WinGo 1 Minute', 60, 'https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json'),
-        ('WinGo_3M', 'WinGo 3 Minutes', 180, 'https://draw.ar-lottery01.com/WinGo/WinGo_3M/GetHistoryIssuePage.json'),
-        ('WinGo_5M', 'WinGo 5 Minutes', 300, 'https://draw.ar-lottery01.com/WinGo/WinGo_5M/GetHistoryIssuePage.json'),
-        ('WinGo_10M', 'WinGo 10 Minutes', 600, 'https://draw.ar-lottery01.com/WinGo/WinGo_10M/GetHistoryIssuePage.json');
+        INSERT OR IGNORE INTO wingo_games (game_code, name, interval_seconds, lock_seconds, external_api_url) VALUES
+        ('WinGo_30S', 'WinGo 30 Seconds', 30, 5, 'https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json'),
+        ('WinGo_1M', 'WinGo 1 Minute', 60, 5, 'https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json'),
+        ('WinGo_3M', 'WinGo 3 Minutes', 180, 10, 'https://draw.ar-lottery01.com/WinGo/WinGo_3M/GetHistoryIssuePage.json'),
+        ('WinGo_5M', 'WinGo 5 Minutes', 300, 15, 'https://draw.ar-lottery01.com/WinGo/WinGo_5M/GetHistoryIssuePage.json'),
+        ('WinGo_10M', 'WinGo 10 Minutes', 600, 30, 'https://draw.ar-lottery01.com/WinGo/WinGo_10M/GetHistoryIssuePage.json');
 
-        -- Insert demo test user with 10,000 credits
         INSERT OR IGNORE INTO shonu_kaichila (balakedara, motta) VALUES (1001, 10000.00);
 SQL;
         $pdo->exec($schema);
