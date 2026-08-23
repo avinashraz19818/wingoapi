@@ -1,6 +1,7 @@
 <?php
 /**
- * WinGo API Gateway & Dynamic Router
+ * WinGo Universal API Gateway & Drop-in Router
+ * Compatible with in999, 91club, Daman, BDG, and ar-lottery01 clone scripts.
  * Host: api.devlopedwithzayro.site
  */
 
@@ -12,24 +13,42 @@ require_once __DIR__ . '/api/common.php';
 $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $uri = rtrim($uri, '/');
 
-// 1. Interactive Visual Frontend Game & Dashboard
+// 1. Direct drop-in support for: /WinGo/{GameCode}/GetHistoryIssuePage.json
+if (preg_match('#/WinGo/([^/]+)/GetHistoryIssuePage\.json#i', $uri, $m)) {
+    $_GET['game'] = $m[1];
+    require __DIR__ . '/api/get_history.php';
+    exit;
+}
+
+// 2. Direct drop-in support for: /WinGo/{GameCode}/GetNoaverageEmerdList.json
+if (preg_match('#/WinGo/([^/]+)/GetNoaverageEmerdList\.json#i', $uri, $m)) {
+    $_GET['game'] = $m[1];
+    require __DIR__ . '/api/get_issue.php';
+    exit;
+}
+
+// 3. Interactive Visual Frontend Game & Dashboard
 if ($uri === '/app' || $uri === '/game' || $uri === '/play' || $uri === '/index.html' || $uri === '/demo') {
     header('Content-Type: text/html; charset=utf-8');
     readfile(__DIR__ . '/index.html');
     exit;
 }
 
-// 2. Root / Health Check & API Docs
+// 4. Root / Health Check & API Docs
 if ($uri === '' || $uri === '/' || $uri === '/health' || $uri === '/api/health') {
     jsonSuccess([
         'system' => 'WinGo Automated Lottery & Betting API Engine',
         'domain' => getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site',
         'status' => 'ONLINE',
-        'version' => '2.4.0',
+        'version' => '2.5.0',
         'frontend_app' => 'https://' . (getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site') . '/index.html',
         'server_time' => date('Y-m-d H:i:s'),
         'timezone' => date_default_timezone_get(),
-        'endpoints' => [
+        'dropin_endpoints' => [
+            'https://api.devlopedwithzayro.site/WinGo/WinGo_1M/GetHistoryIssuePage.json' => 'Exact drop-in replacement for draw.ar-lottery01.com',
+            'https://api.devlopedwithzayro.site/WinGo/WinGo_30S/GetHistoryIssuePage.json' => 'WinGo 30S drop-in replacement'
+        ],
+        'standard_endpoints' => [
             'GET  /api/issue?game=WinGo_1M' => 'Current issue, countdown seconds, and lock state',
             'GET  /api/history?game=WinGo_1M&limit=50' => 'Historical draw results list',
             'POST /api/bet' => 'Place user bet atomically with balance check',
@@ -37,14 +56,13 @@ if ($uri === '' || $uri === '/' || $uri === '/health' || $uri === '/api/health')
             'GET  /api/sync' => 'Sync draws from external provider (ar-lottery01) & auto-settle',
             'GET  /api/settle' => 'Trigger manual bet settlement for completed draws',
             'GET  /api/wallet?user_id=1001' => 'User balance check',
-            'POST /api/wallet' => 'Deposit/recharge balance',
-            'GET  /api/test_api' => 'Full diagnostic & mathematical check'
+            'POST /api/wallet' => 'Deposit/recharge balance'
         ],
         'supported_games' => ['WinGo_30S', 'WinGo_1M', 'WinGo_3M', 'WinGo_5M', 'WinGo_10M']
     ], 'WinGo API is operational');
 }
 
-// 3. Clean Route Mapping
+// 5. Clean Route Mapping
 $routes = [
     '/api/issue' => __DIR__ . '/api/get_issue.php',
     '/api/get_issue' => __DIR__ . '/api/get_issue.php',
@@ -58,7 +76,8 @@ $routes = [
     '/api/settle' => __DIR__ . '/api/settle.php',
     '/api/wallet' => __DIR__ . '/api/wallet.php',
     '/api/test_api' => __DIR__ . '/api/test_api.php',
-    '/api/docs' => __DIR__ . '/api/test_api.php'
+    '/api/webapi/GetHistoryIssuePage' => __DIR__ . '/api/get_history.php',
+    '/api/webapi/GetNoaverageEmerdList' => __DIR__ . '/api/get_issue.php'
 ];
 
 if (isset($routes[$uri]) && file_exists($routes[$uri])) {
@@ -66,7 +85,7 @@ if (isset($routes[$uri]) && file_exists($routes[$uri])) {
     exit;
 }
 
-// If file exists under /api/ directly (e.g. /api/get_issue.php)
+// Direct php file execution
 $directFile = __DIR__ . $uri;
 if (file_exists($directFile) && is_file($directFile)) {
     require $directFile;
