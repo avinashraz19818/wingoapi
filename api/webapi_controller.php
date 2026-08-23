@@ -79,7 +79,9 @@ switch (strtolower($action)) {
     case 'gethistoryissuepage':
     case 'gethistory':
     case 'history':
-        $history = $syncService->getHistory($gameCode, $pageSize);
+        $issue = $syncService->getCurrentIssue($gameCode);
+        $activeIssue = $issue['issue_number'] ?? null;
+        $history = $syncService->getHistory($gameCode, $pageSize, $activeIssue);
         $list = [];
         foreach ($history as $row) {
             $num = (int)$row['number'];
@@ -153,7 +155,52 @@ switch (strtolower($action)) {
         ], JSON_UNESCAPED_UNICODE);
         exit;
 
-    // 3. Bet Place Endpoint: POST /api/webapi/WinGoBet
+    // 3. Direct Draw Result Lookup: POST /api/webapi/GetWinTheLotteryResult
+    case 'getwinthelotteryresult':
+    case 'getresultbyissue':
+    case 'result':
+        $issueNum = $payload['issueNumber'] ?? $payload['issue_number'] ?? $_GET['issueNumber'] ?? $_GET['issue_number'] ?? '';
+        if (is_array($issueNum)) $issueNum = $issueNum[0] ?? '';
+        $issueNum = (string)$issueNum;
+
+        $row = null;
+        if (!empty($issueNum)) {
+            $stmt = $pdo->prepare("SELECT issue_number, number, color, premium, sum, draw_time FROM wingo_results WHERE game_code = ? AND issue_number = ? LIMIT 1");
+            $stmt->execute([$gameCode, $issueNum]);
+            $row = $stmt->fetch();
+        }
+
+        if (!$row) {
+            $stmt = $pdo->prepare("SELECT issue_number, number, color, premium, sum, draw_time FROM wingo_results WHERE game_code = ? ORDER BY id DESC LIMIT 1");
+            $stmt->execute([$gameCode]);
+            $row = $stmt->fetch();
+        }
+
+        if ($row) {
+            $num = (int)$row['number'];
+            echo json_encode([
+                'code' => 0,
+                'msg' => 'success',
+                'msgCode' => 0,
+                'data' => [
+                    'issueNumber' => (string)$row['issue_number'],
+                    'number'      => (string)$num,
+                    'colour'      => (string)$row['color'],
+                    'color'       => (string)$row['color'],
+                    'drawTime'    => (string)$row['draw_time'],
+                    'typeId'      => (int)$typeId
+                ]
+            ], JSON_UNESCAPED_UNICODE);
+        } else {
+            echo json_encode([
+                'code' => 1,
+                'msg' => 'Result not found',
+                'msgCode' => 1
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+
+    // 4. Bet Place Endpoint: POST /api/webapi/WinGoBet
     case 'wingobet':
     case 'bet':
     case 'placebet':
@@ -192,7 +239,7 @@ switch (strtolower($action)) {
         }
         exit;
 
-    // 4. User Bet History: POST /api/webapi/GetMyEmerdList
+    // 5. User Bet History: POST /api/webapi/GetMyEmerdList
     case 'getmyemerdlist':
     case 'userbets':
     case 'mybets':
@@ -212,7 +259,6 @@ switch (strtolower($action)) {
         exit;
 
     default:
-        // Default history fallback
         $history = $syncService->getHistory($gameCode, $pageSize);
         echo json_encode([
             'code' => 0,
