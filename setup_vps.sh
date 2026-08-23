@@ -54,8 +54,11 @@ FLUSH PRIVILEGES;
 
 DB_CONFIGURED=0
 
-# Try socket auth as root user
-if mariadb -e "$SQL_COMMANDS" 2>/dev/null; then
+# Try Ubuntu/Debian system maintenance credentials (bypasses root password completely)
+if [ -f /etc/mysql/debian.cnf ] && mysql --defaults-file=/etc/mysql/debian.cnf -e "$SQL_COMMANDS" 2>/dev/null; then
+    echo "[+] Database configured via debian.cnf system maintenance credentials."
+    DB_CONFIGURED=1
+elif mariadb -e "$SQL_COMMANDS" 2>/dev/null; then
     echo "[+] Database configured via MariaDB root socket."
     DB_CONFIGURED=1
 elif mysql -e "$SQL_COMMANDS" 2>/dev/null; then
@@ -64,9 +67,7 @@ elif mysql -e "$SQL_COMMANDS" 2>/dev/null; then
 fi
 
 if [ $DB_CONFIGURED -eq 0 ]; then
-    echo "[!] MySQL root password required. If you don't know it, press CTRL+C and run:"
-    echo "    sudo mariadb-admin -u root password 'your_new_password'"
-    echo "Please enter MySQL root password:"
+    echo "[!] Trying direct root login. Enter password (or press Enter if blank):"
     mysql -u root -p -e "$SQL_COMMANDS"
 fi
 
