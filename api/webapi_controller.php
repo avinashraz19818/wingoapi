@@ -129,6 +129,12 @@ switch (strtolower($action)) {
     case 'getissue':
     case 'issue':
         $issue = $syncService->getCurrentIssue($gameCode);
+        $startTs = strtotime($issue['start_time']);
+        $endTs = strtotime($issue['end_time']);
+        $nowTs = time();
+
+        // 91club frontend expects timestamps in milliseconds (e.g. 1787482560000)
+        // so that parseInt(t.startTime / 1e3) parses correctly into seconds!
         echo json_encode([
             'code' => 0,
             'msg' => 'success',
@@ -138,9 +144,10 @@ switch (strtolower($action)) {
                 'issueNumber'       => (string)$issue['issue_number'],
                 'issue_number'      => (string)$issue['issue_number'],
                 'nextIssueNumber'   => (string)$issue['next_issue_number'],
-                'startTime'         => $issue['start_time'],
-                'endTime'           => $issue['end_time'],
-                'openTime'          => $issue['end_time'],
+                'startTime'         => $startTs * 1000,
+                'endTime'           => $endTs * 1000,
+                'openTime'          => $endTs * 1000,
+                'serviceTime'       => $nowTs * 1000,
                 'seconds'           => (int)$issue['seconds_left'],
                 'secondsLeft'       => (int)$issue['seconds_left'],
                 'interval'          => (int)$issue['interval'],
