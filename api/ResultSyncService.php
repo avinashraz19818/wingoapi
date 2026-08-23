@@ -116,7 +116,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Derive issue number dynamically
+        // Derive issue number with offset
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs, $interval);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -206,9 +206,11 @@ class ResultSyncService {
     }
 
     /**
-     * Derive active issue number based on latest history draw or algorithmic fallback
+     * Derive active issue number based on latest history draw with configurable period offset
      */
     private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs, int $interval): string {
+        $offset = (int)ISSUE_OFFSET;
+
         $stmt = $this->pdo->prepare("
             SELECT issue_number, draw_time 
             FROM wingo_results 
@@ -228,8 +230,8 @@ class ResultSyncService {
             $elapsed = max(0, time() - $lastDrawTs);
             $intervalsPassed = max(1, (int)floor($elapsed / $interval));
 
-            $activeSeq = $lastSeq + $intervalsPassed;
-            return $prefix . sprintf('%04d', $activeSeq);
+            $activeSeq = $lastSeq + $intervalsPassed + $offset;
+            return $prefix . sprintf('%04d', max(1, $activeSeq));
         }
 
         return $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);

@@ -46,9 +46,13 @@ if (!defined('USER_BAL_COL')) define('USER_BAL_COL', getenv('USER_BAL_COL') ?: '
 // Platform Commission Rate
 if (!defined('PLATFORM_FEE_RATE')) define('PLATFORM_FEE_RATE', (float)(getenv('PLATFORM_FEE_RATE') ?: 0.02));
 
+// Period Offset (e.g. -1 to lag 1 period behind, 0 for exact, +1 for ahead)
+if (!defined('ISSUE_OFFSET')) define('ISSUE_OFFSET', (int)(getenv('ISSUE_OFFSET') !== false ? getenv('ISSUE_OFFSET') : -1));
+
 // Game Definitions & External Sources
 return [
     'domain' => getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site',
+    'issue_offset' => ISSUE_OFFSET,
     'games' => [
         'WinGo_30S' => [
             'name' => 'WinGo 30 Seconds',
