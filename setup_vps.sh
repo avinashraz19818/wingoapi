@@ -37,7 +37,7 @@ PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;" 2>/dev/null
 PHP_FPM_SOCK="/var/run/php/php${PHP_VERSION}-fpm.sock"
 echo "[+] Using PHP ${PHP_VERSION} (Socket: ${PHP_FPM_SOCK})"
 
-# 3. Database Setup (Supports root without password, with sudo, or prompts)
+# 3. Database Setup
 echo "[+] Step 3: Configuring Database & User (${DB_NAME})..."
 systemctl start mariadb || systemctl start mysql
 
@@ -52,13 +52,21 @@ GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';
 FLUSH PRIVILEGES;
 "
 
-# Try native root socket first (Ubuntu default)
-if mysql -e "$SQL_COMMANDS" 2>/dev/null; then
-    echo "[+] Database configured via standard MySQL socket."
-elif mariadb -e "$SQL_COMMANDS" 2>/dev/null; then
+DB_CONFIGURED=0
+
+# Try socket auth as root user
+if mariadb -e "$SQL_COMMANDS" 2>/dev/null; then
     echo "[+] Database configured via MariaDB root socket."
-else
-    echo "[!] MySQL requires a root password. Please enter MySQL root password:"
+    DB_CONFIGURED=1
+elif mysql -e "$SQL_COMMANDS" 2>/dev/null; then
+    echo "[+] Database configured via MySQL socket."
+    DB_CONFIGURED=1
+fi
+
+if [ $DB_CONFIGURED -eq 0 ]; then
+    echo "[!] MySQL root password required. If you don't know it, press CTRL+C and run:"
+    echo "    sudo mariadb-admin -u root password 'your_new_password'"
+    echo "Please enter MySQL root password:"
     mysql -u root -p -e "$SQL_COMMANDS"
 fi
 
@@ -69,7 +77,8 @@ SCHEMA_PATH="${INSTALL_DIR}/schema.sql"
 
 if [ -f "$SCHEMA_PATH" ]; then
     mysql -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < "$SCHEMA_PATH" 2>/dev/null || \
-    mysql -h 127.0.0.1 -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < "$SCHEMA_PATH"
+    mysql -h 127.0.0.1 -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < "$SCHEMA_PATH" 2>/dev/null || \
+    mariadb -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < "$SCHEMA_PATH"
     echo "[+] Schema imported successfully."
 fi
 
@@ -128,11 +137,9 @@ sed -i "s|api.devlopedwithzayro.site|${DOMAIN}|g" "/etc/nginx/sites-available/${
 sed -i "s|/var/www/wingoapi|${INSTALL_DIR}|g" "/etc/nginx/sites-available/${DOMAIN}.conf"
 sed -i "s|PHP_SOCK_PLACEHOLDER|${PHP_FPM_SOCK}|g" "/etc/nginx/sites-available/${DOMAIN}.conf"
 
-# Remove default site if it blocks port 80
 rm -f /etc/nginx/sites-enabled/default
 ln -sf "/etc/nginx/sites-available/${DOMAIN}.conf" "/etc/nginx/sites-enabled/${DOMAIN}.conf"
 
-# Test and start Nginx
 fuser -k 80/tcp 2>/dev/null || true
 systemctl restart "php${PHP_VERSION}-fpm" 2>/dev/null || true
 systemctl restart nginx
