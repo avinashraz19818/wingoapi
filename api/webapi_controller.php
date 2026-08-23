@@ -168,12 +168,14 @@ switch (strtolower($action)) {
             $stmt = $pdo->prepare("SELECT issue_number, number, color, premium, sum, draw_time FROM wingo_results WHERE game_code = ? AND issue_number = ? LIMIT 1");
             $stmt->execute([$gameCode, $issueNum]);
             $row = $stmt->fetch();
-        }
 
-        if (!$row) {
-            $stmt = $pdo->prepare("SELECT issue_number, number, color, premium, sum, draw_time FROM wingo_results WHERE game_code = ? ORDER BY id DESC LIMIT 1");
-            $stmt->execute([$gameCode]);
-            $row = $stmt->fetch();
+            if (!$row) {
+                try {
+                    $syncService->syncGame($gameCode);
+                    $stmt->execute([$gameCode, $issueNum]);
+                    $row = $stmt->fetch();
+                } catch (Throwable $e) {}
+            }
         }
 
         if ($row) {
