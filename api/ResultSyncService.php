@@ -11,12 +11,10 @@ require_once __DIR__ . '/ExternalLotteryAPI.php';
 class ResultSyncService {
     private PDO $pdo;
     private ExternalLotteryAPI $api;
-    private array $config;
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->api = new ExternalLotteryAPI();
-        $this->config = require __DIR__ . '/../config.php';
     }
 
     /**
@@ -48,9 +46,6 @@ class ResultSyncService {
         // Update real-time issue timing & tracking
         $this->updateCurrentIssue($gameCode, (int)$game['interval_seconds']);
 
-        // Log sync record
-        $this->logSync($gameCode, 'SUCCESS', count($results), $saved, "Synced {$saved} new records");
-
         return [
             'game_code' => $gameCode,
             'fetched' => count($results),
@@ -72,7 +67,6 @@ class ResultSyncService {
             try {
                 $results[$gameCode] = $this->syncGame($gameCode);
             } catch (Exception $e) {
-                $this->logSync($gameCode, 'FAILED', 0, 0, $e->getMessage());
                 $results[$gameCode] = ['error' => $e->getMessage()];
             }
         }
@@ -85,15 +79,9 @@ class ResultSyncService {
      */
     private function saveResult(array $data): bool {
         try {
-            if (DB_TYPE === 'sqlite') {
-                $sql = "INSERT OR IGNORE INTO wingo_results 
-                        (game_code, issue_number, number, color, premium, sum, draw_time)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)";
-            } else {
-                $sql = "INSERT IGNORE INTO wingo_results 
-                        (game_code, issue_number, number, color, premium, sum, draw_time)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)";
-            }
+            $sql = "INSERT IGNORE INTO wingo_results 
+                    (game_code, issue_number, number, color, premium, sum, draw_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)";
 
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([
@@ -108,7 +96,6 @@ class ResultSyncService {
 
             return $stmt->rowCount() > 0;
         } catch (PDOException $e) {
-            error_log("Failed to save result: " . $e->getMessage());
             return false;
         }
     }
@@ -129,39 +116,26 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        $currentIssue = $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);
-        $nextIssue = $this->api->calculateIssueNumberForTime($gameCode, $nextStartTs);
+        // Derive issue number dynamically
+        $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs, $interval);
+        $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
         $currentStartStr = date('Y-m-d H:i:s', $currentStartTs);
         $currentEndStr = date('Y-m-d H:i:s', $currentEndTs);
         $nextStartStr = date('Y-m-d H:i:s', $nextStartTs);
         $nextEndStr = date('Y-m-d H:i:s', $nextEndTs);
 
-        if (DB_TYPE === 'sqlite') {
-            $sql = "INSERT INTO wingo_current_issue 
-                    (game_code, current_issue, current_start, current_end, next_issue, next_start, next_end, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(game_code) DO UPDATE SET
-                    current_issue=excluded.current_issue,
-                    current_start=excluded.current_start,
-                    current_end=excluded.current_end,
-                    next_issue=excluded.next_issue,
-                    next_start=excluded.next_start,
-                    next_end=excluded.next_end,
-                    updated_at=CURRENT_TIMESTAMP";
-        } else {
-            $sql = "INSERT INTO wingo_current_issue 
-                    (game_code, current_issue, current_start, current_end, next_issue, next_start, next_end)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                    current_issue=VALUES(current_issue),
-                    current_start=VALUES(current_start),
-                    current_end=VALUES(current_end),
-                    next_issue=VALUES(next_issue),
-                    next_start=VALUES(next_start),
-                    next_end=VALUES(next_end),
-                    updated_at=CURRENT_TIMESTAMP";
-        }
+        $sql = "INSERT INTO wingo_current_issue 
+                (game_code, current_issue, current_start, current_end, next_issue, next_start, next_end)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                current_issue=VALUES(current_issue),
+                current_start=VALUES(current_start),
+                current_end=VALUES(current_end),
+                next_issue=VALUES(next_issue),
+                next_start=VALUES(next_start),
+                next_end=VALUES(next_end),
+                updated_at=CURRENT_TIMESTAMP";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
@@ -201,15 +175,14 @@ class ResultSyncService {
         $interval = (int)$game['interval_seconds'];
         $lockSeconds = (int)($game['lock_seconds'] ?? 5);
 
-        // Always compute dynamic current timestamp to avoid desync
         $now = time();
         $currentStartTs = $now - ($now % $interval);
         $currentEndTs = $currentStartTs + $interval;
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        $currentIssue = $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);
-        $nextIssue = $this->api->calculateIssueNumberForTime($gameCode, $nextStartTs);
+        $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs, $interval);
+        $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
         $secondsLeft = max(0, $currentEndTs - $now);
         $isLocked = ($secondsLeft <= $lockSeconds);
@@ -233,6 +206,48 @@ class ResultSyncService {
     }
 
     /**
+     * Derive active issue number based on latest history draw or algorithmic fallback
+     */
+    private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs, int $interval): string {
+        $stmt = $this->pdo->prepare("
+            SELECT issue_number, draw_time 
+            FROM wingo_results 
+            WHERE game_code = ? 
+            ORDER BY issue_number DESC 
+            LIMIT 1
+        ");
+        $stmt->execute([$gameCode]);
+        $latest = $stmt->fetch();
+
+        if ($latest && strlen($latest['issue_number']) >= 10) {
+            $latestIssue = (string)$latest['issue_number'];
+            $prefix = substr($latestIssue, 0, -4);
+            $lastSeq = (int)substr($latestIssue, -4);
+
+            $lastDrawTs = strtotime($latest['draw_time']);
+            $elapsed = max(0, time() - $lastDrawTs);
+            $intervalsPassed = max(1, (int)floor($elapsed / $interval));
+
+            $activeSeq = $lastSeq + $intervalsPassed;
+            return $prefix . sprintf('%04d', $activeSeq);
+        }
+
+        return $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);
+    }
+
+    /**
+     * Derive next issue number from active issue string
+     */
+    private function deriveNextIssueNumber(string $currentIssue): string {
+        if (strlen($currentIssue) >= 10) {
+            $prefix = substr($currentIssue, 0, -4);
+            $seq = (int)substr($currentIssue, -4);
+            return $prefix . sprintf('%04d', $seq + 1);
+        }
+        return (string)((int)$currentIssue + 1);
+    }
+
+    /**
      * Get historical draw results
      */
     public function getHistory(string $gameCode, int $limit = 50): array {
@@ -249,20 +264,5 @@ class ResultSyncService {
         $stmt->execute();
         
         return $stmt->fetchAll();
-    }
-
-    /**
-     * Internal audit logging
-     */
-    private function logSync(string $gameCode, string $status, int $fetched, int $inserted, string $msg): void {
-        try {
-            $stmt = $this->pdo->prepare("
-                INSERT INTO wingo_sync_logs (game_code, status, records_fetched, records_inserted, message)
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([$gameCode, $status, $fetched, $inserted, $msg]);
-        } catch (PDOException $e) {
-            // Silence log errors
-        }
     }
 }
