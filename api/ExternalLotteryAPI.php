@@ -54,14 +54,14 @@ class ExternalLotteryAPI {
     }
 
     /**
-     * Normalize incoming draw record
+     * Normalize incoming draw record exactly from ar-lottery
      */
     public function normalizeResult(array $item, string $gameCode): array {
         $number = (int)($item['number'] ?? 0);
-        $color = $item['color'] ?? $this->calculateColorFromNumber($number);
+        $color = !empty($item['color']) ? $item['color'] : $this->calculateColorFromNumber($number);
         $drawTime = !empty($item['drawTime']) 
             ? date('Y-m-d H:i:s', strtotime($item['drawTime']))
-            : date('Y-m-d H:i:s');
+            : (!empty($item['draw_time']) ? $item['draw_time'] : date('Y-m-d H:i:s'));
 
         return [
             'game_code' => $gameCode,
@@ -69,7 +69,7 @@ class ExternalLotteryAPI {
             'number' => $number,
             'color' => $color,
             'premium' => $item['premium'] ?? (string)$number,
-            'sum' => $item['sum'] ?? 0,
+            'sum' => isset($item['sum']) ? (int)$item['sum'] : $number,
             'draw_time' => $drawTime
         ];
     }
@@ -133,7 +133,7 @@ class ExternalLotteryAPI {
                 'number' => $num,
                 'color' => $this->calculateColorFromNumber($num),
                 'premium' => (string)$num,
-                'sum' => 0,
+                'sum' => $num,
                 'drawTime' => date('Y-m-d H:i:s', $drawTimestamp)
             ];
         }

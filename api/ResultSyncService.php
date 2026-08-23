@@ -18,7 +18,7 @@ class ResultSyncService {
     }
 
     /**
-     * Sync single game code results
+     * Sync single game code results directly from external source
      */
     public function syncGame(string $gameCode): array {
         $stmt = $this->pdo->prepare("SELECT * FROM wingo_games WHERE game_code = ? AND status = 1");
@@ -43,7 +43,7 @@ class ResultSyncService {
             }
         }
 
-        // Update real-time issue timing & tracking
+        // Update real-time issue timing
         $this->updateCurrentIssue($gameCode, (int)$game['interval_seconds']);
 
         return [
@@ -116,8 +116,8 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Derive issue number with offset
-        $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs, $interval);
+        // Derive issue number dynamically
+        $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
         $currentStartStr = date('Y-m-d H:i:s', $currentStartTs);
@@ -181,7 +181,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs, $interval);
+        $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
         $secondsLeft = max(0, $currentEndTs - $now);
@@ -206,31 +206,31 @@ class ResultSyncService {
     }
 
     /**
-     * Derive active issue number based on latest history draw with configurable period offset
+     * Derive active issue number cleanly based on latest drawn issue from database
      */
-    private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs, int $interval): string {
-        $offset = (int)ISSUE_OFFSET;
-
+    private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs): string {
         $stmt = $this->pdo->prepare("
-            SELECT issue_number, draw_time 
+            SELECT issue_number 
             FROM wingo_results 
             WHERE game_code = ? 
-            ORDER BY issue_number DESC 
+            ORDER BY id DESC 
             LIMIT 1
         ");
         $stmt->execute([$gameCode]);
         $latest = $stmt->fetch();
+
+        // Offset setting: 
+        // 0 = Exact next upcoming period (lastSeq + 1)
+        // -1 = 1 Period Piche (lastSeq)
+        // -2 = 2 Periods Piche (lastSeq - 1)
+        $offset = (int)ISSUE_OFFSET;
 
         if ($latest && strlen($latest['issue_number']) >= 10) {
             $latestIssue = (string)$latest['issue_number'];
             $prefix = substr($latestIssue, 0, -4);
             $lastSeq = (int)substr($latestIssue, -4);
 
-            $lastDrawTs = strtotime($latest['draw_time']);
-            $elapsed = max(0, time() - $lastDrawTs);
-            $intervalsPassed = max(1, (int)floor($elapsed / $interval));
-
-            $activeSeq = $lastSeq + $intervalsPassed + $offset;
+            $activeSeq = $lastSeq + 1 + $offset;
             return $prefix . sprintf('%04d', max(1, $activeSeq));
         }
 
@@ -250,7 +250,7 @@ class ResultSyncService {
     }
 
     /**
-     * Get historical draw results
+     * Get historical draw results ordered by freshest ID DESC
      */
     public function getHistory(string $gameCode, int $limit = 50): array {
         $limit = max(1, min(200, $limit));
@@ -258,7 +258,7 @@ class ResultSyncService {
             SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
             FROM wingo_results 
             WHERE game_code = ? 
-            ORDER BY issue_number DESC 
+            ORDER BY id DESC 
             LIMIT ?
         ");
         $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
