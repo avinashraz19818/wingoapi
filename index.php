@@ -12,13 +12,21 @@ require_once __DIR__ . '/api/common.php';
 $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $uri = rtrim($uri, '/');
 
-// 1. Root / Health Check
+// 1. Interactive Visual Frontend Game & Dashboard
+if ($uri === '/app' || $uri === '/game' || $uri === '/play' || $uri === '/index.html' || $uri === '/demo') {
+    header('Content-Type: text/html; charset=utf-8');
+    readfile(__DIR__ . '/index.html');
+    exit;
+}
+
+// 2. Root / Health Check & API Docs
 if ($uri === '' || $uri === '/' || $uri === '/health' || $uri === '/api/health') {
     jsonSuccess([
         'system' => 'WinGo Automated Lottery & Betting API Engine',
         'domain' => getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site',
         'status' => 'ONLINE',
         'version' => '2.4.0',
+        'frontend_app' => 'https://' . (getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site') . '/index.html',
         'server_time' => date('Y-m-d H:i:s'),
         'timezone' => date_default_timezone_get(),
         'endpoints' => [
@@ -36,7 +44,7 @@ if ($uri === '' || $uri === '/' || $uri === '/health' || $uri === '/api/health')
     ], 'WinGo API is operational');
 }
 
-// 2. Clean Route Mapping
+// 3. Clean Route Mapping
 $routes = [
     '/api/issue' => __DIR__ . '/api/get_issue.php',
     '/api/get_issue' => __DIR__ . '/api/get_issue.php',
