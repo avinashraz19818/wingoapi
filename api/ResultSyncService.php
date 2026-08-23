@@ -253,7 +253,7 @@ class ResultSyncService {
             FROM wingo_results 
             WHERE game_code = ? 
             ORDER BY id DESC 
-            LIMIT ? OFFSET 1
+            LIMIT ?
         ");
         $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
         $stmt->bindValue(2, $limit, PDO::PARAM_INT);
