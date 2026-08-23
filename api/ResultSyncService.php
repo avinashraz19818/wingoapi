@@ -116,7 +116,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Current issue = EXACTLY the latest drawn issue number from external result!
+        // Current active issue is the top drawn issue
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -181,7 +181,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Active issue is EXACTLY the latest drawn issue
+        // Current active betting issue
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -207,7 +207,7 @@ class ResultSyncService {
     }
 
     /**
-     * Derive active issue number: Returns EXACTLY the latest drawn result from the external API!
+     * Active issue is the latest drawn issue from external provider
      */
     private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs): string {
         $stmt = $this->pdo->prepare("
@@ -240,21 +240,42 @@ class ResultSyncService {
     }
 
     /**
-     * Get historical draw results ordered by freshest ID DESC
+     * Get historical draw results:
+     * Offsets by 1 to hide the current active/in-progress issue from history
+     * so history only shows completed/previous periods.
      */
     public function getHistory(string $gameCode, int $limit = 50): array {
         $limit = max(1, min(200, $limit));
+
+        // Query with OFFSET 1 to display finished past draws
         $stmt = $this->pdo->prepare("
             SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
             FROM wingo_results 
             WHERE game_code = ? 
             ORDER BY id DESC 
-            LIMIT ?
+            LIMIT ? OFFSET 1
         ");
         $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
         $stmt->bindValue(2, $limit, PDO::PARAM_INT);
         $stmt->execute();
         
-        return $stmt->fetchAll();
+        $history = $stmt->fetchAll();
+
+        // If less than 2 records in DB, return standard list
+        if (empty($history)) {
+            $stmt = $this->pdo->prepare("
+                SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
+                FROM wingo_results 
+                WHERE game_code = ? 
+                ORDER BY id DESC 
+                LIMIT ?
+            ");
+            $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
+            $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $history = $stmt->fetchAll();
+        }
+
+        return $history;
     }
 }
