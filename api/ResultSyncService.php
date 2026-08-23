@@ -116,7 +116,7 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Current active issue is the top drawn issue
+        // Current active issue
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -181,7 +181,6 @@ class ResultSyncService {
         $nextStartTs = $currentEndTs;
         $nextEndTs = $nextStartTs + $interval;
 
-        // Current active betting issue
         $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs);
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
@@ -207,7 +206,7 @@ class ResultSyncService {
     }
 
     /**
-     * Active issue is the latest drawn issue from external provider
+     * Active issue is the next upcoming period after latest drawn
      */
     private function deriveActiveIssueNumber(string $gameCode, int $currentStartTs): string {
         $stmt = $this->pdo->prepare("
@@ -220,8 +219,11 @@ class ResultSyncService {
         $stmt->execute([$gameCode]);
         $latest = $stmt->fetch();
 
-        if ($latest && !empty($latest['issue_number'])) {
-            return (string)$latest['issue_number'];
+        if ($latest && strlen($latest['issue_number']) >= 10) {
+            $latestIssue = (string)$latest['issue_number'];
+            $prefix = substr($latestIssue, 0, -4);
+            $lastSeq = (int)substr($latestIssue, -4);
+            return $prefix . sprintf('%04d', $lastSeq + 1);
         }
 
         return $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs);
@@ -240,42 +242,22 @@ class ResultSyncService {
     }
 
     /**
-     * Get historical draw results:
-     * Offsets by 1 to hide the current active/in-progress issue from history
-     * so history only shows completed/previous periods.
+     * Get historical draw results: Returns full latest results without skipping
      */
     public function getHistory(string $gameCode, int $limit = 50): array {
         $limit = max(1, min(200, $limit));
 
-        // Query with OFFSET 1 to display finished past draws
         $stmt = $this->pdo->prepare("
             SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
             FROM wingo_results 
             WHERE game_code = ? 
             ORDER BY id DESC 
-            LIMIT ? OFFSET 1
+            LIMIT ?
         ");
         $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
         $stmt->bindValue(2, $limit, PDO::PARAM_INT);
         $stmt->execute();
         
-        $history = $stmt->fetchAll();
-
-        // If less than 2 records in DB, return standard list
-        if (empty($history)) {
-            $stmt = $this->pdo->prepare("
-                SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
-                FROM wingo_results 
-                WHERE game_code = ? 
-                ORDER BY id DESC 
-                LIMIT ?
-            ");
-            $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
-            $stmt->bindValue(2, $limit, PDO::PARAM_INT);
-            $stmt->execute();
-            $history = $stmt->fetchAll();
-        }
-
-        return $history;
+        return $stmt->fetchAll();
     }
 }

@@ -2,7 +2,7 @@
 /**
  * API Endpoint: Get Historical Draw Results
  * URL: /api/get_history.php?game=WinGo_1M&limit=50
- * Supports 100% backward compatibility with in999, 91club, and ar-lottery01 schemas.
+ * Compatible with ar-lottery01, in999, 91club, and Daman schemas.
  */
 
 declare(strict_types=1);
@@ -26,33 +26,33 @@ try {
     
     $rawHistory = $syncService->getHistory($gameCode, $limit);
 
-    // Format fields in BOTH camelCase (issueNumber) and snake_case (issue_number)
     $formattedList = [];
     foreach ($rawHistory as $row) {
+        $num = (int)$row['number'];
         $formattedList[] = [
             'issueNumber'  => (string)$row['issue_number'],
             'issue_number' => (string)$row['issue_number'],
-            'number'       => (string)$row['number'],
-            'drawNumber'   => (string)$row['number'],
+            'number'       => (string)$num,
+            'drawNumber'   => (string)$num,
             'color'        => (string)$row['color'],
-            'premium'      => (string)($row['premium'] ?? $row['number']),
-            'sum'          => (int)($row['sum'] ?? $row['number']),
+            'colour'       => (string)$row['color'],
+            'premium'      => (string)($row['premium'] ?? $num),
+            'sum'          => (int)($row['sum'] ?? $num),
             'drawTime'     => (string)$row['draw_time'],
-            'draw_time'    => (string)$row['draw_time']
+            'draw_time'    => (string)$row['draw_time'],
+            'openTime'     => (string)$row['draw_time']
         ];
     }
 
-    // Return standard ar-lottery / in999 wrapper
+    // Return exact data structure as ar-lottery01 / in999
     echo json_encode([
         'code' => 0,
         'msg' => 'success',
         'data' => [
-            'game_code' => $gameCode,
-            'count' => count($formattedList),
             'list' => $formattedList
         ],
         'time' => date('Y-m-d H:i:s')
-    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 
 } catch (Throwable $e) {
