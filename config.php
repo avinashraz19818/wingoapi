@@ -91,6 +91,17 @@ if (!defined('UPSTREAM_FALLBACK')) define('UPSTREAM_FALLBACK', (getenv('UPSTREAM
 return [
     'domain' => getenv('API_DOMAIN') ?: 'api.devlopedwithzayro.site',
     'issue_offset' => ISSUE_OFFSET,
+    // Period timing.
+    'period' => [
+        // The provider hands over each result this many seconds BEFORE its own minute ends
+        // (it publishes 841 while 840 is still counting down). We shift our countdown by the
+        // same amount, so our rollover lands that many seconds ahead of the plain minute and
+        // the next result is always already stored when the timer hits 00.
+        // WinGo_1M with 2 => our periods tick at :58. Set RESULT_LEAD_SECONDS=0 to tick on
+        // the plain minute instead.
+        'result_lead_seconds' => (int)(getenv('RESULT_LEAD_SECONDS') !== false
+            ? getenv('RESULT_LEAD_SECONDS') : 2),
+    ],
     'live_pull' => [
         'enabled'        => LIVE_PULL_ENABLED,
         'min_gap'        => LIVE_PULL_MIN_GAP,

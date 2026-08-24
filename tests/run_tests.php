@@ -108,12 +108,13 @@ assertTest("Get history returns items", count($history) > 0);
 // 5. ZERO-DELAY REGRESSION SUITE
 //    Hermetic: throwaway SQLite DB, so the live data file is never touched.
 //
-//    Model under test (what production must do):
+//    Model under test (exactly what production must do):
 //      - the period number ALWAYS comes from the provider's own feed, never from our clock
-//      - we run ONE PERIOD BEHIND the provider's newest draw, so the result of the period on
-//        screen (and of the one after it) is already stored before the countdown ends
-//      - history shows everything older than the period on screen, so nothing leaks early and
-//        the reveal at 00 is a pure local read - no network round-trip
+//      - the provider's newest draw IS the period open for betting; history stops one short
+//        of it, so the feed reads one period behind the provider
+//      - the provider publishes ~2s before its minute ends, so our countdown is shifted by
+//        the same 2s: it starts the instant a draw is published and ends the instant the next
+//        one is - the reveal and the settlement at 00 are pure local reads, no network
 // =========================================================================
 echo "\n--- 5. Zero-Delay Issue / History / Settlement ---\n";
 
@@ -137,9 +138,6 @@ assertTest("Issue matches real provider draw 20260824100010884", $refIssue === '
 
 $interval = 60;
 $now = time();
-$bucket = $now - ($now % $interval);          // start of the window we are in
-$prevStart = $bucket - $interval;             // start of the window that just closed
-$prev2Start = $bucket - (2 * $interval);      // start of the window before that
 
 // 5b. Storing a provider batch: portable insert, and the newest draw must get the highest id.
 //     Providers send the list NEWEST first.
@@ -154,64 +152,78 @@ $second = $zsync->persistResults('WinGo_1M', $batch);
 assertTest("Duplicate draw ignored instead of erroring", $second['saved'] === 0 && $second['skipped_duplicates'] === 2, json_encode($second));
 assertTest("Record without issue number is skipped", $zsync->persistResults('WinGo_1M', [['number' => 3]])['invalid'] === 1);
 
-// 5c. Four draws with controlled arrival times:
-//       A,B -> arrived two windows ago   (B is the newest of them -> B goes on screen)
-//       C   -> arrived during the previous window (already stored, ready for the next rollover)
-//       D   -> arrived during the current window (the provider's newest)
+// 5c. Countdown phase. The provider hands the next result over 2s before its minute ends, so
+//     our periods must tick 2s early too - that is what removes the wait at the boundary.
+$lead = $zsync->resultLeadSeconds($interval);
+assertTest("Result lead is 2s (the provider publishes at :58)", $lead === 2, (string)$lead);
+assertTest("Phase offset = interval - lead", $zsync->phaseOffsetSeconds($interval) === 58, (string)$zsync->phaseOffsetSeconds($interval));
+assertTest("WinGo_30S gets its own 28s phase", $zsync->phaseOffsetSeconds(30) === 28, (string)$zsync->phaseOffsetSeconds(30));
+$ws = $zsync->windowStart($interval, $now);
+assertTest("Our window starts at :58, two seconds before the minute", (int)date('s', $ws) === 58, date('H:i:s', $ws));
+assertTest("Window start is in the past and less than a period old", $ws <= $now && ($now - $ws) < $interval, date('H:i:s', $ws) . " vs now " . date('H:i:s', $now));
+
+// 5d. The provider's feed with controlled arrival times:
+//       A -> two windows ago
+//       B -> last window (the period that just closed)
+//       C -> published right at our window start (the provider's 2s-early draw) => ON SCREEN
 $A = '20260824100010881';
 $B = '20260824100010882';
 $C = '20260824100010883';
-$D = '20260824100010884';
 $insDraw = $tpdo->prepare("INSERT INTO wingo_results (game_code, issue_number, number, color, premium, sum, draw_time, fetched_at) VALUES ('WinGo_1M', ?, ?, ?, ?, ?, ?, ?)");
-$insDraw->execute([$A, 1, 'green', '1', 1, date('Y-m-d H:i:s', $prev2Start), $zsync->dbTime($prev2Start)]);
-$insDraw->execute([$B, 7, 'green', '7', 7, date('Y-m-d H:i:s', $prev2Start + 1), $zsync->dbTime($prev2Start + 1)]);
-$insDraw->execute([$C, 3, 'green', '3', 3, date('Y-m-d H:i:s', $prevStart), $zsync->dbTime($prevStart)]);
-$insDraw->execute([$D, 5, 'green,violet', '5', 5, date('Y-m-d H:i:s', $bucket), $zsync->dbTime($bucket)]);
-
-$rowId = function (string $issue) use ($tpdo): int {
-    $st = $tpdo->prepare("SELECT id FROM wingo_results WHERE game_code = 'WinGo_1M' AND issue_number = ?");
-    $st->execute([$issue]);
-    return (int)$st->fetchColumn();
-};
+$insDraw->execute([$A, 1, 'green',        '1', 1, date('Y-m-d H:i:s', $ws - 120), $zsync->dbTime($ws - 120)]);
+$insDraw->execute([$B, 7, 'green',        '7', 7, date('Y-m-d H:i:s', $ws - 60),  $zsync->dbTime($ws - 60)]);
+$insDraw->execute([$C, 3, 'green',        '3', 3, date('Y-m-d H:i:s', $ws),       $zsync->dbTime($ws)]);
 
 $current = $zsync->getCurrentIssue('WinGo_1M', false);
-assertTest("Screen shows one period behind the provider's newest draw", $current['issue_number'] === $B, $current['issue_number'] . " (provider newest is {$D})");
-assertTest("seconds_left inside the interval", $current['seconds_left'] >= 0 && $current['seconds_left'] <= $interval, (string)$current['seconds_left']);
-assertTest("Result of the period on screen is already stored", $zsync->getResult('WinGo_1M', $B) !== null);
-assertTest("Next period's result is already stored too (nothing to wait for at 00)", $zsync->getResult('WinGo_1M', $C) !== null);
+assertTest("Betting period is the provider's newest draw", $current['issue_number'] === $C, $current['issue_number']);
+assertTest("Arrival order beats issue-number order (890 stored earlier is not on screen)", $current['issue_number'] !== '20260824100010890', $current['issue_number']);
 assertTest("Nothing pending while the provider keeps up", $current['result_pending'] === false, json_encode($current['result_pending']));
+assertTest("seconds_left inside the interval", $current['seconds_left'] >= 0 && $current['seconds_left'] <= $interval, (string)$current['seconds_left']);
+assertTest("Result of the open period is already stored", $zsync->getResult('WinGo_1M', $C) !== null);
+assertTest("next_issue_number is the open period + 1", $current['next_issue_number'] === '20260824100010884', $current['next_issue_number']);
 
 $histNow = array_column($zsync->getHistory('WinGo_1M', 10, $current['history_before_id']), 'issue_number');
-assertTest("History top is the period before the one on screen", ($histNow[0] ?? null) === $A, implode(',', $histNow));
-assertTest("Period on screen is NOT leaked into history", !in_array($B, $histNow, true), implode(',', $histNow));
-assertTest("Draws known ahead are NOT leaked either", !in_array($C, $histNow, true) && !in_array($D, $histNow, true), implode(',', $histNow));
+assertTest("History is one period behind the provider (top = B)", ($histNow[0] ?? null) === $B, implode(',', $histNow));
+assertTest("The open period's own result is NOT in history yet", !in_array($C, $histNow, true), implode(',', $histNow));
+assertTest("last_issue_number matches the top of history", $current['last_issue_number'] === $B, (string)$current['last_issue_number']);
 
-// At 00 the screen moves to C and B is revealed - both are local reads, no upstream call.
-$histAfter = array_column($zsync->getHistory('WinGo_1M', 10, $rowId($C)), 'issue_number');
-assertTest("Result appears in history the instant the timer ends", ($histAfter[0] ?? null) === $B, implode(',', $histAfter));
-
-// 5d. Settlement fires exactly when the player can see the result - never before.
+// 5e. Settlement: a bet on a closed period settles in the same request; the open one waits.
 $zbets->deposit(9998, 1000.0);
 $balanceBefore = $zbets->getWallet(9998)['balance'];
 $insBet = $tpdo->prepare("INSERT INTO wingo_bets (user_id, game_code, issue_number, bet_type, bet_value, amount, odds, status, payout) VALUES (9998, 'WinGo_1M', ?, 'number', ?, 100, 9, 'pending', 0)");
-$insBet->execute([$A, '1']);
-$settleRevealed = $zbets->ensureSettled('WinGo_1M');
-assertTest("Bet on a revealed period settles in the same request", $settleRevealed['settled_count'] === 1 && $settleRevealed['won_count'] === 1, json_encode($settleRevealed));
-assertTest("Payout applies 9x odds minus 2% fee", abs($settleRevealed['total_payout'] - 882.0) < 0.001, (string)$settleRevealed['total_payout']);
+$insBet->execute([$B, '7']);   // B is 7 -> wins 9x
+$settleClosed = $zbets->ensureSettled('WinGo_1M');
+assertTest("Bet on a closed period settles in the same request", $settleClosed['settled_count'] === 1 && $settleClosed['won_count'] === 1, json_encode($settleClosed));
+assertTest("Payout applies 9x odds minus 2% fee", abs($settleClosed['total_payout'] - 882.0) < 0.001, (string)$settleClosed['total_payout']);
 assertTest(
     "Wallet credited in the same request",
     abs($zbets->getWallet(9998)['balance'] - ($balanceBefore + 882.0)) < 0.001,
     $zbets->getWallet(9998)['balance'] . " vs expected " . ($balanceBefore + 882.0)
 );
 
-$insBet->execute([$B, '7']);
+$insBet->execute([$C, '1']);   // C is 3 -> would lose, but must stay pending until rollover
 $settleOpen = $zbets->ensureSettled('WinGo_1M');
-assertTest("Bet on the period still on screen stays pending", $settleOpen['settled_count'] === 0, json_encode($settleOpen));
-assertTest("Settleable count ignores the period on screen", $zbets->countSettleableBets('WinGo_1M') === 0, (string)$zbets->countSettleableBets('WinGo_1M'));
+assertTest("Bet on the open period stays pending", $settleOpen['settled_count'] === 0, json_encode($settleOpen));
+assertTest("Settleable count ignores the open period", $zbets->countSettleableBets('WinGo_1M') === 0, (string)$zbets->countSettleableBets('WinGo_1M'));
 
-// 5e. Live pull is a no-op (no network) when the previous window already delivered a draw.
+// 5f. Rollover. The provider publishes the next draw -> the period on screen advances, the
+//     closed one tops history, and its bets settle. All local reads, no upstream call.
+$D = '20260824100010884';
+$insDraw->execute([$D, 9, 'green', '9', 9, date('Y-m-d H:i:s', $ws + 60), $zsync->dbTime($ws + 60)]);
+
+$after = $zsync->getCurrentIssue('WinGo_1M', false);
+assertTest("Next published draw moves straight into the betting period", $after['issue_number'] === $D, $after['issue_number']);
+$histAfter = array_column($zsync->getHistory('WinGo_1M', 10, $after['history_before_id']), 'issue_number');
+assertTest("Closed period tops history the instant the timer ends", ($histAfter[0] ?? null) === $C, implode(',', $histAfter));
+assertTest("Still exactly one period behind after rollover", $after['last_issue_number'] === $C, (string)$after['last_issue_number']);
+
+$settleRollover = $zbets->ensureSettled('WinGo_1M');
+assertTest("Bet on the closed period settles at rollover", $settleRollover['settled_count'] === 1, json_encode($settleRollover));
+assertTest("Settled as a loss (C is 3, the bet was on 1)", $settleRollover['won_count'] === 0, json_encode($settleRollover));
+
+// 5g. Live pull is a no-op (no network) when the provider already published in this window.
 $pull = $zsync->ensureLiveResult('WinGo_1M');
-assertTest("Live pull short-circuits when a draw already arrived last window", $pull['needed'] === false && $pull['fresh'] === true, json_encode($pull));
+assertTest("Live pull short-circuits when this window already has a draw", $pull['needed'] === false && $pull['fresh'] === true, json_encode($pull));
 
 @unlink($tmpDb);
 

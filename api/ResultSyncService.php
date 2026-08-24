@@ -48,6 +48,75 @@ class ResultSyncService {
         $this->newResultsHandler = $handler;
     }
 
+    /**
+     * How many seconds before its own minute ends the provider hands over the next result.
+     * Clamped so it can never eat the whole period.
+     */
+    public function resultLeadSeconds(int $interval): int
+    {
+        $lead = (int)($this->config['period']['result_lead_seconds'] ?? 2);
+        if ($interval <= 1) {
+            return 0;
+        }
+        return max(0, min($lead, $interval - 1));
+    }
+
+    /**
+     * Seconds our period boundaries sit past the plain wall-clock minute.
+     *
+     * The provider publishes $lead seconds early, so we start counting $lead seconds early
+     * too: our countdown for a period begins the instant the provider publishes it and ends
+     * the instant it publishes the next one. For WinGo_1M with a 2s lead that is a 58s phase,
+     * i.e. our rollover lands at :58 - two seconds ahead of the plain minute.
+     */
+    public function phaseOffsetSeconds(int $interval): int
+    {
+        if ($interval <= 0) {
+            return 0;
+        }
+        return ($interval - $this->resultLeadSeconds($interval)) % $interval;
+    }
+
+    /**
+     * Start of the window that contains $now, honouring the phase offset.
+     */
+    public function windowStart(int $interval, int $now): int
+    {
+        if ($interval <= 0) {
+            return $now;
+        }
+        $phase = $this->phaseOffsetSeconds($interval);
+        return intdiv($now - $phase, $interval) * $interval + $phase;
+    }
+
+    /**
+     * DB-clock bounds of the window containing $now: [start, start + interval + 1).
+     * Used to answer "did the provider publish anything during this period?".
+     *
+     * @return array{0:string,1:string}
+     */
+    private function freshnessWindow(int $interval, int $now): array {
+        $start = $this->windowStart($interval, $now);
+        return [$this->dbTime($start), $this->dbTime($start + $interval + 1)];
+    }
+
+    /**
+     * The provider's newest stored draw: the period currently open for betting.
+     */
+    private function newestRow(string $gameCode): ?array {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, issue_number, fetched_at FROM wingo_results
+                 WHERE game_code = ? ORDER BY id DESC LIMIT 1"
+            );
+            $stmt->execute([$gameCode]);
+            $row = $stmt->fetch();
+            return $row ?: null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
     private function liveConfig(): array {
         return $this->config['live_pull'] ?? [
             'enabled' => true, 'min_gap' => 0.8, 'window' => 10.0, 'max_wait' => 2.5,
@@ -260,11 +329,14 @@ class ResultSyncService {
     public function ensureLiveResult(string $gameCode, bool $force = false): array {
         $interval = $this->getIntervalSeconds($gameCode);
         $now = time();
-        $periodStart = $now - ($now % $interval);
-        $visibleBefore = $this->dbTime($periodStart);
-        $prevWindowStart = $this->dbTime($periodStart - $interval);
+        $periodStart = $this->windowStart($interval, $now);
 
-        $fresh = $this->hasDrawInWindow($gameCode, $prevWindowStart, $visibleBefore);
+        // One single definition of "the provider has published during this window", used by
+        // every branch below: the period on screen belongs to this window, so the next
+        // rollover needs no network.
+        [$freshFrom, $freshTo] = $this->freshnessWindow($interval, $now);
+
+        $fresh = $this->hasDrawInWindow($gameCode, $freshFrom, $freshTo);
         if ($fresh) {
             return ['needed' => false, 'fetched' => false, 'saved' => 0, 'fresh' => true];
         }
@@ -291,7 +363,7 @@ class ResultSyncService {
         // once per second can never turn into one upstream call per second.
         $state = $this->stateFile($gameCode);
         if (!$this->throttleAllows($state, (float)$cfg['min_gap'])) {
-            return ['needed' => true, 'fetched' => false, 'saved' => 0, 'fresh' => $this->waitForFresh($gameCode, $prevWindowStart, $visibleBefore, (float)$cfg['max_wait'])];
+            return ['needed' => true, 'fetched' => false, 'saved' => 0, 'fresh' => $this->waitForFresh($gameCode, $freshFrom, $freshTo, (float)$cfg['max_wait'])];
         }
 
         // Single flight across every PHP-FPM worker: only one request talks to the provider,
@@ -301,12 +373,12 @@ class ResultSyncService {
             if ($lock !== false) {
                 fclose($lock);
             }
-            return ['needed' => true, 'fetched' => false, 'saved' => 0, 'fresh' => $this->waitForFresh($gameCode, $prevWindowStart, $visibleBefore, (float)$cfg['max_wait'])];
+            return ['needed' => true, 'fetched' => false, 'saved' => 0, 'fresh' => $this->waitForFresh($gameCode, $freshFrom, $freshTo, (float)$cfg['max_wait'])];
         }
 
         try {
             // Double-check: a sibling request may have written the row while we waited.
-            if ($this->hasDrawInWindow($gameCode, $prevWindowStart, $visibleBefore)) {
+            if ($this->hasDrawInWindow($gameCode, $freshFrom, $freshTo)) {
                 $this->touchState($state);
                 return ['needed' => true, 'fetched' => false, 'saved' => 0, 'fresh' => true];
             }
@@ -323,7 +395,7 @@ class ResultSyncService {
                 'needed' => true,
                 'fetched' => !empty($list),
                 'saved' => $saved,
-                'fresh' => $this->hasDrawInWindow($gameCode, $prevWindowStart, $visibleBefore),
+                'fresh' => $this->hasDrawInWindow($gameCode, $freshFrom, $freshTo),
             ];
         } finally {
             flock($lock, LOCK_UN);
@@ -389,7 +461,7 @@ class ResultSyncService {
         $interval = ($interval && $interval > 0) ? $interval : $this->getIntervalSeconds($gameCode);
 
         $now = time();
-        $currentStartTs = $now - ($now % $interval);
+        $currentStartTs = $this->windowStart($interval, $now);
         $currentEndTs = $currentStartTs + $interval;
 
         // Same source of truth as getCurrentIssue(): the provider's newest draw.
@@ -466,72 +538,77 @@ class ResultSyncService {
             $interval = $this->api->getInterval($gameCode); // never divide by zero on a bad row
         }
         $lockSeconds = isset($game['lock_seconds']) ? (int)$game['lock_seconds'] : 5;
+        $leadSeconds = $this->resultLeadSeconds($interval);
 
         $now = time();
-        $currentStartTs = $now - ($now % $interval);
+        $currentStartTs = $this->windowStart($interval, $now);
         $currentEndTs = $currentStartTs + $interval;
 
-        // ONE PERIOD BEHIND THE PROVIDER, on purpose.
+        // THE MODEL
+        // -------
+        // The provider publishes the result of a period ~$leadSeconds BEFORE its own minute
+        // ends (it hands over 841 while 840 is still counting down). Our window is shifted by
+        // the same amount, so the moment the provider publishes, our countdown for that period
+        // starts - and it ends exactly when the next one is published. Nothing is ever waiting
+        // on the network at the boundary.
         //
-        // The period shown to the player is the newest draw that arrived at least one full
-        // window ago. Its result is therefore already stored, and so is the result of the
-        // period after it - so when the countdown hits 00 the reveal and the rollover are
-        // pure local reads: no network round-trip, no waiting.
+        //   provider's last result  ->  the period shown for betting (issue_number)
+        //   everything older        ->  history (one period behind the provider)
         //
-        // The number itself always comes from the provider's feed, never from our clock: the
+        // The number always comes from the provider's own feed, never from our clock: the
         // provider's counter does not track our time (it has been seen jumping backwards).
-        $prevWindowStartTs = $currentStartTs - $interval;
-        $openRow = $this->latestRowBefore($gameCode, $this->dbTime($prevWindowStartTs));
+        $openRow = $this->newestRow($gameCode);
 
         if ($openRow !== null) {
             $currentIssue = (string)$openRow['issue_number'];
-            $openRowId = (int)$openRow['id'];
+            $openRowId    = (int)$openRow['id'];
+            // Pending means the provider has not published anything during this window yet, so
+            // the period on screen is the previous one running over.
+            $resultPending = ((string)$openRow['fetched_at']) < $this->dbTime($currentStartTs);
         } else {
-            // Not enough stored history yet (fresh install): newest draw, else clock fallback.
-            $currentIssue = $this->latestStoredIssue($gameCode)
-                ?? $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs, $interval);
-            $openRowId = null;
+            // No stored draws at all (fresh install): fall back to the clock-derived number.
+            $currentIssue  = $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs, $interval);
+            $openRowId     = null;
+            $resultPending = true;
         }
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
-        $secondsLeft = max(0, $currentEndTs - $now);
-        $isLocked = ($secondsLeft <= $lockSeconds);
-
-        // History shows everything OLDER than the period on screen. The period being bet on and
-        // the draws already known ahead of it stay hidden, so a result can never be seen before
-        // its countdown ends - and it appears the instant it does.
-        $prevWindowStart = $this->dbTime($prevWindowStartTs);
-        $visibleBefore = $this->dbTime($currentStartTs);
-
-        $revealedIssue = $openRowId !== null ? $this->issueBeforeId($gameCode, $openRowId) : null;
-        $resultPending = !$this->hasDrawInWindow($gameCode, $prevWindowStart, $visibleBefore);
-
         if ($autoPull && $resultPending) {
             $pull = $this->ensureLiveResult($gameCode);
-            $resultPending = empty($pull['fresh']);
-            $openRow = $this->latestRowBefore($gameCode, $prevWindowStart);
-            if ($openRow !== null) {
-                $currentIssue = (string)$openRow['issue_number'];
-                $openRowId = (int)$openRow['id'];
-                $nextIssue = $this->deriveNextIssueNumber($currentIssue);
-                $revealedIssue = $this->issueBeforeId($gameCode, $openRowId);
+            $row  = $this->newestRow($gameCode);
+            if ($row !== null) {
+                $currentIssue  = (string)$row['issue_number'];
+                $openRowId     = (int)$row['id'];
+                $resultPending = ((string)$row['fetched_at']) < $this->dbTime($currentStartTs);
+                $nextIssue     = $this->deriveNextIssueNumber($currentIssue);
+            } else {
+                $resultPending = empty($pull['fresh']);
             }
         }
+
+        $secondsLeft = max(0, $currentEndTs - $now);
+        $isLocked    = ($secondsLeft <= $lockSeconds);
+
+        // History stops one short of the period on screen: the result of the period being bet
+        // on stays hidden until it rolls over, and the period that just closed becomes the top
+        // row at that same instant.
+        $lastIssue = $openRowId !== null ? $this->issueBeforeId($gameCode, $openRowId) : null;
 
         return [
             'game_code' => $gameCode,
             'game_name' => $game['name'],
             'interval' => $interval,
             'lock_seconds' => $lockSeconds,
+            'result_lead_seconds' => $leadSeconds,
             'issue_number' => $currentIssue,
             'start_time' => date('Y-m-d H:i:s', $currentStartTs),
             'end_time' => date('Y-m-d H:i:s', $currentEndTs),
             'next_issue_number' => $nextIssue,
             'next_start_time' => date('Y-m-d H:i:s', $currentEndTs),
             'next_end_time' => date('Y-m-d H:i:s', $currentEndTs + $interval),
-            'last_issue_number' => $revealedIssue,
+            'last_issue_number' => $lastIssue,
+            'open_row_id' => $openRowId,
             'history_before_id' => $openRowId,
-            'visible_before' => $visibleBefore,
             'result_pending' => $resultPending,
             'result_available' => !$resultPending,
             'seconds_left' => $secondsLeft,
@@ -546,27 +623,8 @@ class ResultSyncService {
      * Draws with a lower id are visible / settleable; that row and everything newer are not.
      */
     public function openRowId(string $gameCode): ?int {
-        $interval = $this->getIntervalSeconds($gameCode);
-        $now = time();
-        $currentStartTs = $now - ($now % $interval);
-        $row = $this->latestRowBefore($gameCode, $this->dbTime($currentStartTs - $interval));
+        $row = $this->newestRow($gameCode);
         return $row === null ? null : (int)$row['id'];
-    }
-
-    /**
-     * Newest draw that arrived strictly before $before (DB clock).
-     */
-    private function latestRowBefore(string $gameCode, string $before): ?array {
-        try {
-            $stmt = $this->pdo->prepare(
-                "SELECT id, issue_number FROM wingo_results WHERE game_code = ? AND fetched_at < ? ORDER BY id DESC LIMIT 1"
-            );
-            $stmt->execute([$gameCode, $before]);
-            $row = $stmt->fetch();
-            return $row ?: null;
-        } catch (Throwable $e) {
-            return null;
-        }
     }
 
     /**
@@ -673,6 +731,14 @@ class ResultSyncService {
      * the countdown hits 00 the new row is at the top of history with no network round-trip.
      *
      * @param int|null $beforeId exclude this row and everything newer (the period on screen)
+     */
+    /**
+     * Result history, newest first - one period behind the provider.
+     *
+     * $beforeId is the row currently on screen (getCurrentIssue()['history_before_id']): only
+     * rows older than it are returned, so the result of the period being bet on is never
+     * readable early. The period that just closed becomes the top row the instant the provider
+     * publishes the next one, which is also the instant our countdown ends.
      */
     public function getHistory(string $gameCode, int $limit = 50, ?int $beforeId = null): array {
         $limit = max(1, min(200, $limit));
