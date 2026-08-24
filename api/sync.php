@@ -16,17 +16,23 @@ try {
     $syncService = new ResultSyncService($pdo);
     $betService = new BetService($pdo);
 
+    // Settle as soon as fresh draws land, not on a later pass.
+    $syncService->onNewResults(function (string $gameCode) use ($betService): void {
+        $betService->settlePendingBets($gameCode);
+    });
+
     $gameCode = $_GET['game'] ?? null;
+    $allowFallback = isset($_GET['fallback']) && (string)$_GET['fallback'] === '1';
     $syncResults = [];
 
     if (!empty($gameCode)) {
-        $syncResults[$gameCode] = $syncService->syncGame($gameCode);
+        $syncResults[$gameCode] = $syncService->syncGame($gameCode, $allowFallback);
     } else {
-        $syncResults = $syncService->syncAll();
+        $syncResults = $syncService->syncAll($allowFallback);
     }
 
     // Auto-settle pending bets right after syncing fresh results
-    $settlement = $betService->settlePendingBets($gameCode);
+    $settlement = $betService->settlePendingBets($gameCode !== null && $gameCode !== '' ? $gameCode : null);
 
     jsonSuccess([
         'sync' => $syncResults,

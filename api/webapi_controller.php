@@ -14,6 +14,12 @@ $pdo = DB::getConnection();
 $syncService = new ResultSyncService($pdo);
 $betService = new BetService($pdo);
 
+// Whenever a request pulls fresh draws from the provider, settle the matching bets in the same
+// request. Without this the win/lose popup waited for the next cron cycle.
+$syncService->onNewResults(function (string $gameCode) use ($betService): void {
+    $betService->settlePendingBets($gameCode);
+});
+
 $payload = getRequestPayload();
 
 // Helper to map In999 typeId to standard gameCode
@@ -143,6 +149,9 @@ switch (strtolower($action)) {
                 'serviceTime'       => date('Y-m-d H:i:s'),
                 'seconds'           => (int)$issue['seconds_left'],
                 'secondsLeft'       => (int)$issue['seconds_left'],
+                'lastIssueNumber'   => (string)($issue['last_issue_number'] ?? ''),
+                'resultPending'     => (bool)($issue['result_pending'] ?? false),
+                'resultAvailable'   => (bool)($issue['result_available'] ?? true),
                 'interval'          => (int)$issue['interval'],
                 'intervalM'         => (float)($issue['interval'] == 30 ? 0.5 : round($issue['interval'] / 60, 1)),
                 'isLocked'          => (bool)$issue['is_locked'],
@@ -164,16 +173,24 @@ switch (strtolower($action)) {
         $issueNum = (string)$issueNum;
 
         $row = null;
+
+        // No issue supplied -> the client wants "the result that just landed"
+        $issueInfo = $syncService->getCurrentIssue($gameCode);
+        if ($issueNum === '') {
+            $issueNum = (string)($issueInfo['last_issue_number'] ?? '');
+        }
+
         if (!empty($issueNum)) {
-            $stmt = $pdo->prepare("SELECT issue_number, number, color, premium, sum, draw_time FROM wingo_results WHERE game_code = ? AND issue_number = ? LIMIT 1");
-            $stmt->execute([$gameCode, $issueNum]);
-            $row = $stmt->fetch();
+            $row = $syncService->getResult($gameCode, $issueNum);
 
             if (!$row) {
+                // Zero-delay: pull it from the provider right now instead of waiting for cron.
                 try {
-                    $syncService->syncGame($gameCode);
-                    $stmt->execute([$gameCode, $issueNum]);
-                    $row = $stmt->fetch();
+                    $pull = $syncService->ensureLiveResult($gameCode, true);
+                    $row = $pull['row'] ?? null;
+                    if ($row === null || (string)$row['issue_number'] !== $issueNum) {
+                        $row = $syncService->getResult($gameCode, $issueNum);
+                    }
                 } catch (Throwable $e) {}
             }
         }
@@ -251,6 +268,10 @@ switch (strtolower($action)) {
     case 'userbets':
     case 'mybets':
         $userId = (int)($payload['user_id'] ?? $payload['userId'] ?? $_GET['user_id'] ?? 1001);
+        // Settle first so the bet list / win-lose popup is never a cron cycle behind.
+        try {
+            $betService->ensureSettled($gameCode);
+        } catch (Throwable $e) {}
         $bets = $betService->getUserBets($userId, $gameCode, $pageSize);
         echo json_encode([
             'code' => 0,
@@ -288,22 +309,9 @@ switch (strtolower($action)) {
         if (empty($list) && isset($payload['issueNumber']) && isset($payload['number'])) {
             $list = [$payload];
         }
-        $saved = 0;
-        foreach ($list as $item) {
-            $normalized = (new ExternalLotteryAPI())->normalizeResult($item, $gameCode);
-            $stmt = $pdo->prepare("INSERT IGNORE INTO wingo_results (game_code, issue_number, number, color, premium, sum, draw_time) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([
-                $normalized['game_code'],
-                $normalized['issue_number'],
-                $normalized['number'],
-                $normalized['color'],
-                $normalized['premium'],
-                $normalized['sum'],
-                $normalized['draw_time']
-            ]);
-            if ($stmt->rowCount() > 0) $saved++;
-        }
-        $syncService->updateCurrentIssue($gameCode);
+        // persistResults() normalizes, upserts portably and settles the matching bets at once.
+        $result = $syncService->persistResults($gameCode, is_array($list) ? $list : []);
+        $saved = (int)($result['saved'] ?? 0);
         echo json_encode([
             'code' => 0,
             'msg' => "Synced {$saved} draws successfully",
@@ -313,7 +321,8 @@ switch (strtolower($action)) {
         exit;
 
     default:
-        $history = $syncService->getHistory($gameCode, $pageSize);
+        $issueInfo = $syncService->getCurrentIssue($gameCode);
+        $history = $syncService->getHistory($gameCode, $pageSize, $issueInfo['issue_number'] ?? null);
         echo json_encode([
             'code' => 0,
             'msg' => 'Succeed',

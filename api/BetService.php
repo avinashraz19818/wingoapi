@@ -12,11 +12,16 @@ class BetService {
     private PDO $pdo;
     private ResultSyncService $syncService;
     private array $config;
+    private string $driver;
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->syncService = new ResultSyncService($pdo);
         $this->config = require __DIR__ . '/../config.php';
+        // Ask the connection, not the DB_TYPE constant: conn.php silently falls back to SQLite
+        // when MySQL is unreachable, and appending "FOR UPDATE" there breaks every bet with a
+        // SQL syntax error.
+        $this->driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     }
 
     /**
@@ -93,8 +98,9 @@ class BetService {
         $betValue = strtolower(trim($betValue));
         $this->validateBetInput($betType, $betValue, $amount);
 
-        // Get current period and verify betting is not locked
-        $issueData = $this->syncService->getCurrentIssue($gameCode);
+        // Get current period and verify betting is not locked.
+        // autoPull=false: placing a bet must never wait on an upstream HTTP call.
+        $issueData = $this->syncService->getCurrentIssue($gameCode, false);
         if ($issueData['is_locked']) {
             throw new RuntimeException("Betting is currently locked for issue #{$issueData['issue_number']}. Next issue opens in {$issueData['seconds_left']}s.");
         }
@@ -111,7 +117,7 @@ class BetService {
                 USER_BAL_COL,
                 USER_TABLE,
                 USER_ID_COL,
-                (DB_TYPE === 'mysql' ? 'FOR UPDATE' : '')
+                ($this->driver === 'mysql' ? 'FOR UPDATE' : '')
             );
             $stmt = $this->pdo->prepare($walletSql);
             $stmt->execute([$userId]);
@@ -182,23 +188,92 @@ class BetService {
     }
 
     /**
-     * Settle all pending bets where drawn results exist in database
+     * Zero-delay settlement used by the player-facing endpoints.
+     *
+     * Pulls the just-closed result on demand (if the worker has not landed it yet) and then
+     * settles, so the win/lose popup and the wallet balance update the moment the countdown
+     * hits 00 instead of on the next cron tick.
      */
-    public function settlePendingBets(?string $gameCode = null): array {
-        // Query pending bets joined with results
-        $sql = "
-            SELECT b.id AS bet_id, b.user_id, b.game_code, b.issue_number, b.bet_type, 
-                   b.bet_value, b.amount, b.odds, r.number AS draw_number, r.color AS draw_color
-            FROM wingo_bets b
-            INNER JOIN wingo_results r ON b.game_code = r.game_code AND b.issue_number = r.issue_number
-            WHERE b.status = 'pending'
-        ";
+    public function ensureSettled(string $gameCode, bool $force = false): array {
+        try {
+            $this->syncService->ensureLiveResult($gameCode, $force);
+        } catch (Throwable $e) {
+            error_log("BetService::ensureSettled live pull failed: " . $e->getMessage());
+        }
+
+        if ($this->countSettleableBets($gameCode) === 0) {
+            return [
+                'settled_count' => 0,
+                'won_count' => 0,
+                'lost_count' => 0,
+                'total_payout' => 0.0,
+                'settled_items' => [],
+                'settled_at' => date('Y-m-d H:i:s')
+            ];
+        }
+
+        return $this->settlePendingBets($gameCode);
+    }
+
+    /**
+     * How many pending bets already have a published result AND belong to a closed period.
+     */
+    public function countSettleableBets(?string $gameCode = null): int {
+        [$sql, $params] = $this->settleableBetQuery(
+            "SELECT COUNT(*) FROM wingo_bets b
+             INNER JOIN wingo_results r ON b.game_code = r.game_code AND b.issue_number = r.issue_number",
+            $gameCode
+        );
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return (int)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Shared WHERE clause for settleable bets.
+     * A bet is settleable only when its period has CLOSED - a provider that publishes a result
+     * early must never settle (or reveal) a period that is still accepting bets.
+     */
+    private function settleableBetQuery(string $select, ?string $gameCode): array {
+        $sql = $select . " WHERE b.status = 'pending'";
         $params = [];
 
         if ($gameCode !== null) {
             $sql .= " AND b.game_code = ?";
             $params[] = $gameCode;
+            $openIssue = $this->syncService->getCurrentIssue($gameCode, false)['issue_number'] ?? null;
+            if (!empty($openIssue)) {
+                $sql .= " AND b.issue_number < ?";
+                $params[] = $openIssue;
+            }
         }
+
+        return [$sql, $params];
+    }
+
+    /**
+     * Settle all pending bets where drawn results exist in database.
+     * With no game code it walks every game that has pending bets, so the "period closed"
+     * guard is applied per game exactly like the single-game path.
+     */
+    public function settlePendingBets(?string $gameCode = null): array {
+        if ($gameCode === null) {
+            return $this->settleEveryGame();
+        }
+
+        // Query pending bets joined with results
+        [$sql, $params] = $this->settleableBetQuery("
+            SELECT b.id AS bet_id, b.user_id, b.game_code, b.issue_number, b.bet_type,
+                   b.bet_value, b.amount, b.odds, r.number AS draw_number, r.color AS draw_color
+            FROM wingo_bets b
+            INNER JOIN wingo_results r ON b.game_code = r.game_code AND b.issue_number = r.issue_number",
+            $gameCode
+        );
 
         $sql .= " ORDER BY b.id ASC LIMIT 500";
 
@@ -285,6 +360,39 @@ class BetService {
             'settled_items' => $settledList,
             'settled_at' => date('Y-m-d H:i:s')
         ];
+    }
+
+    /**
+     * Settle every game that has pending bets (used by the worker / /api/sync).
+     */
+    private function settleEveryGame(): array {
+        $aggregate = [
+            'settled_count' => 0,
+            'won_count' => 0,
+            'lost_count' => 0,
+            'total_payout' => 0.0,
+            'settled_items' => [],
+            'settled_at' => date('Y-m-d H:i:s')
+        ];
+
+        try {
+            $games = $this->pdo->query("SELECT DISTINCT game_code FROM wingo_bets WHERE status = 'pending'")
+                ->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Throwable $e) {
+            return $aggregate;
+        }
+
+        foreach ($games as $game) {
+            $part = $this->settlePendingBets((string)$game);
+            $aggregate['settled_count'] += $part['settled_count'];
+            $aggregate['won_count'] += $part['won_count'];
+            $aggregate['lost_count'] += $part['lost_count'];
+            $aggregate['total_payout'] += $part['total_payout'];
+            $aggregate['settled_items'] = array_merge($aggregate['settled_items'], $part['settled_items']);
+        }
+
+        $aggregate['total_payout'] = round($aggregate['total_payout'], 2);
+        return $aggregate;
     }
 
     /**
@@ -443,12 +551,16 @@ class BetService {
     }
 
     /**
-     * Add demo funds to wallet
+     * Add funds to wallet
      */
     public function deposit(int $userId, float $amount): float {
         if ($amount <= 0) {
             throw new InvalidArgumentException("Amount must be positive");
         }
+
+        // Make sure the wallet row exists first, otherwise the UPDATE below silently affects
+        // zero rows and the recharge disappears.
+        $this->getWallet($userId);
 
         $sql = sprintf(
             "UPDATE %s SET %s = %s + ? WHERE %s = ?",

@@ -26,12 +26,18 @@ try {
 
     $pdo = DB::getConnection();
     $syncService = new ResultSyncService($pdo);
+    // getCurrentIssue() also triggers the zero-delay pull of the period that just closed,
+    // so the client's very first poll after 00 already sees the new result in /api/history.
     $issueData = $syncService->getCurrentIssue($gameCode);
 
     // Provide BOTH formats (camelCase and snake_case)
     $response = [
         'issueNumber'       => (string)$issueData['issue_number'],
         'issue_number'      => (string)$issueData['issue_number'],
+        'lastIssueNumber'   => (string)($issueData['last_issue_number'] ?? ''),
+        'last_issue_number' => (string)($issueData['last_issue_number'] ?? ''),
+        'resultPending'     => (bool)($issueData['result_pending'] ?? false),
+        'result_pending'    => (bool)($issueData['result_pending'] ?? false),
         'game_code'         => $issueData['game_code'],
         'game_name'         => $issueData['game_name'],
         'interval'          => $issueData['interval'],

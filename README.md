@@ -16,6 +16,46 @@ Designed for Linux VPS deployment under domain **`api.devlopedwithzayro.site`**.
 
 ---
 
+## ⚡ Zero-Delay Result Delivery (no more 5s wait after the countdown)
+
+**The old problem:** the open period number was derived from "whatever row the last sync happened to
+write", and history deliberately hid the newest row. So when a player's countdown hit `00`, the
+result, the history list and the bet win/lose popup all waited for the *next* cron cycle (~5s, or
+30-60s on cron-job.org) before updating. The client saw this as "API is slow".
+
+**How it works now:**
+
+| Step | Behaviour |
+| --- | --- |
+| Period number | Derived from the **wall clock** (`floor(secondsSinceMidnight/interval)+1`), exactly like the provider numbers its own periods. Rollover is instant and never waits for a sync. |
+| History | Returns every **closed** period (`issue_number < open issue`) — the period that closed one second ago is included immediately. The still-open period stays hidden so its result can never leak early. |
+| Result pull | `ResultSyncService::ensureLiveResult()` — if a period has just closed and its row is missing, the **first client request pulls it from the provider right away** instead of waiting for cron. Single-flight via `flock` + throttled (`LIVE_PULL_MIN_GAP`), so 1000 players cause exactly one upstream call. |
+| Settlement | Bets are settled in the **same request** that pulled the result (`BetService::ensureSettled()`), so the win/lose popup and wallet balance update together with the countdown. |
+| Worker | All games are fetched **in parallel** (`curl_multi`) with short timeouts, so one cycle costs the slowest call instead of the sum of all of them. |
+| Caching | Every JSON response sends `Cache-Control: no-store` so no browser/nginx/CDN can serve a stale history. |
+
+**Integrity guard:** a bet is only settled once its period has **closed**. A provider that publishes
+a result early can never settle (or reveal) a period that is still accepting bets.
+
+### Tuning (`.env`)
+
+```ini
+ISSUE_OFFSET=0            # 0 = live/exact (default). -1 = legacy 1-period lag. +1 = ahead.
+LIVE_PULL_ENABLED=1       # on-demand pull of the just-closed result
+LIVE_PULL_MIN_GAP=0.8     # min seconds between two on-demand pulls per game
+LIVE_PULL_WINDOW=10       # only auto-pull in the first N seconds of a new period
+LIVE_PULL_MAX_WAIT=2.5    # max seconds a request waits for an in-flight pull
+UPSTREAM_TIMEOUT=3        # provider HTTP timeout (runs inside live requests - keep short)
+UPSTREAM_CONNECT_TIMEOUT=2
+UPSTREAM_FALLBACK=0       # 1 = invent fake results when the provider is down (settles real bets!)
+```
+
+> **Note on `ISSUE_OFFSET`:** it used to default to `-1`, which is what put the displayed period one
+> step behind the provider and produced the delay. It now defaults to `0`. If your frontend was
+> built around the lagged numbering, set `ISSUE_OFFSET=-1` to restore it.
+
+---
+
 ## ⚡ 1-Command VPS Setup (Ubuntu / Debian)
 
 On your VPS server, run:
@@ -67,12 +107,18 @@ The installer will automatically:
     "next_issue_number": "2026082300405",
     "next_start_time": "2026-08-23 06:44:00",
     "next_end_time": "2026-08-23 06:45:00",
+    "last_issue_number": "2026082300403",
+    "result_pending": false,
     "seconds_left": 42,
     "is_locked": false,
     "server_time": "2026-08-23 06:43:18"
   }
 }
 ```
+
+`last_issue_number` is the period that just closed and `result_pending` tells the client whether its
+result is already stored (`false` = ready to render). Calling this endpoint also triggers the
+zero-delay pull described above.
 
 ---
 

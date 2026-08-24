@@ -66,7 +66,22 @@ class DB {
         if ($isNew || filesize($dbPath) === 0) {
             self::initSQLiteSchema($pdo);
         }
+        self::ensureColumns($pdo);
         return $pdo;
+    }
+
+    /**
+     * Lightweight idempotent migration for SQLite databases created by an older revision.
+     */
+    private static function ensureColumns(PDO $pdo): void {
+        try {
+            $cols = $pdo->query("PRAGMA table_info(wingo_games)")->fetchAll(PDO::FETCH_COLUMN, 1);
+            if (!in_array('lock_seconds', $cols, true)) {
+                $pdo->exec("ALTER TABLE wingo_games ADD COLUMN lock_seconds INTEGER DEFAULT 5");
+            }
+        } catch (PDOException $e) {
+            // Non-fatal: ResultSyncService falls back to a 5 second lock window.
+        }
     }
 
     public static function initSQLiteSchema(PDO $pdo): void {

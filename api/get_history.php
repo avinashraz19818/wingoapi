@@ -23,8 +23,11 @@ try {
     $limit = (int)($_GET['limit'] ?? $_GET['pageSize'] ?? 50);
     $pdo = DB::getConnection();
     $syncService = new ResultSyncService($pdo);
-    
-    $rawHistory = $syncService->getHistory($gameCode, $limit);
+
+    // Zero-delay: make sure the period that just closed is in the DB before answering, and
+    // hide only the period that is still open (never the newest closed draw).
+    $issueData = $syncService->getCurrentIssue($gameCode);
+    $rawHistory = $syncService->getHistory($gameCode, $limit, $issueData['issue_number'] ?? null);
 
     // Format fields in BOTH camelCase (issueNumber) and snake_case (issue_number)
     $formattedList = [];

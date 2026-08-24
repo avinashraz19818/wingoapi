@@ -12,6 +12,9 @@ require_once __DIR__ . '/BetService.php';
 
 try {
     $gameCode = $_GET['game'] ?? null;
+    if ($gameCode === '') {
+        $gameCode = null;
+    }
     $pdo = DB::getConnection();
     $betService = new BetService($pdo);
 

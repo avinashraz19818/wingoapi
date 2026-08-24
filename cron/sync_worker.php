@@ -2,10 +2,14 @@
 /**
  * WinGo CLI Sync & Settlement Worker
  * Can be executed via Linux Cron, Supervisor, Systemd, or cPanel Cron
- * 
+ *
  * Usage:
  *   One-shot:   php cron/sync_worker.php
- *   Continuous: php cron/sync_worker.php --daemon --sleep=5
+ *   Continuous: php cron/sync_worker.php --daemon --sleep=2
+ *
+ * All games are fetched in PARALLEL (curl_multi), so one cycle costs as much as the slowest
+ * provider call instead of the sum of every call. That keeps results landing within ~1s of a
+ * period closing even when one provider is slow.
  */
 
 declare(strict_types=1);
@@ -20,7 +24,7 @@ require_once __DIR__ . '/../api/BetService.php';
 
 $options = getopt('', ['daemon', 'sleep::']);
 $isDaemon = isset($options['daemon']);
-$sleepSeconds = isset($options['sleep']) ? max(2, (int)$options['sleep']) : 10;
+$sleepSeconds = isset($options['sleep']) ? max(1, (int)$options['sleep']) : 2;
 
 echo "======================================================\n";
 echo "WinGo Automated Sync & Settlement Engine Started\n";
@@ -32,7 +36,13 @@ $pdo = DB::getConnection();
 $syncService = new ResultSyncService($pdo);
 $betService = new BetService($pdo);
 
+// Fresh draws settle immediately, in the same cycle they arrive in.
+$syncService->onNewResults(function (string $gameCode) use ($betService): void {
+    $betService->settlePendingBets($gameCode);
+});
+
 do {
+    $cycleStart = microtime(true);
     $nowStr = date('Y-m-d H:i:s');
     echo "[{$nowStr}] Running Sync Cycle...\n";
 
@@ -57,8 +67,13 @@ do {
     }
 
     if ($isDaemon) {
-        sleep($sleepSeconds);
+        $elapsed = microtime(true) - $cycleStart;
+        // Keep the cadence steady: subtract the time the cycle itself took.
+        $remaining = $sleepSeconds - $elapsed;
+        if ($remaining > 0) {
+            usleep((int)round($remaining * 1000000));
+        }
     }
 } while ($isDaemon);
 
-echo "[{$nowStr}] Cycle Finished.\n";
+echo "[" . date('Y-m-d H:i:s') . "] Cycle Finished.\n";

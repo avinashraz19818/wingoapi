@@ -8,7 +8,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/wingoapi
-ExecStart=/usr/bin/php /var/www/wingoapi/cron/sync_worker.php --daemon --sleep=5
+ExecStart=/usr/bin/php /var/www/wingoapi/cron/sync_worker.php --daemon --sleep=2
 Restart=always
 RestartSec=5
 StandardOutput=append:/var/log/wingo_worker.log

@@ -18,6 +18,14 @@ try {
     $pdo = DB::getConnection();
     $betService = new BetService($pdo);
 
+    // Settle first: this endpoint feeds the win/lose bet popup, which must not lag behind
+    // the countdown by a cron cycle.
+    if (!empty($gameCode)) {
+        try {
+            $betService->ensureSettled($gameCode);
+        } catch (Throwable $e) {}
+    }
+
     $bets = $betService->getUserBets($userId, $gameCode, $limit);
 
     jsonSuccess([

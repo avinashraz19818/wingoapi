@@ -18,6 +18,12 @@ if (!headers_sent()) {
     header('Access-Control-Allow-Headers: DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Token,token,authorization,x-token,X-Token,Accept,Origin,x-auth-token');
     header('Access-Control-Max-Age: 86400');
     header('Content-Type: application/json; charset=utf-8');
+
+    // Draw results / countdowns must never be served from a browser, CDN or nginx cache -
+    // a cached response is exactly what makes history and bet popups appear seconds late.
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
 }
 
 // Handle preflight OPTIONS requests immediately

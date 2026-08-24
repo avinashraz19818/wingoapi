@@ -2,6 +2,12 @@
 
 To ensure your WinGo system automatically pulls external results, advances game periods, and settles player bets without manual intervention, configure automated sync tasks using either **cron-job.org** (cloud-based) or your server's native **cPanel / Linux Crontab**.
 
+> **Note:** the sync worker is now a *safety net*, not the primary delivery path. If a period has
+> just closed and its result is missing, the first player request pulls it from the provider
+> immediately (`ResultSyncService::ensureLiveResult`), so results, history and bet popups no longer
+> wait for the next cron tick. Cron/worker still matters for pre-warming history and for settling
+> when nobody is polling.
+
 ---
 
 ## Method 1: Using cron-job.org (Recommended for Shared Hosting & cPanel)
@@ -51,7 +57,7 @@ After=network.target mysql.service
 Type=simple
 User=www-data
 WorkingDirectory=/var/www/html/wingo-api
-ExecStart=/usr/bin/php /var/www/html/wingo-api/cron/sync_worker.php --daemon --sleep=5
+ExecStart=/usr/bin/php /var/www/html/wingo-api/cron/sync_worker.php --daemon --sleep=2
 Restart=always
 RestartSec=5
 
