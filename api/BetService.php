@@ -236,21 +236,20 @@ class BetService {
 
     /**
      * Shared WHERE clause for settleable bets.
-     * A bet is settleable only when its period has CLOSED - a provider that publishes a result
-     * early must never settle (or reveal) a period that is still accepting bets.
+     *
+     * A bet is settleable once the window its draw arrived in has CLOSED (fetched_at is older
+     * than the current window start). This is numbering-agnostic - the provider's issue counter
+     * can jump around - and it guarantees a draw that is still accepting bets is never settled
+     * or revealed early.
      */
     private function settleableBetQuery(string $select, ?string $gameCode): array {
         $sql = $select . " WHERE b.status = 'pending'";
         $params = [];
 
         if ($gameCode !== null) {
-            $sql .= " AND b.game_code = ?";
+            $sql .= " AND b.game_code = ? AND r.fetched_at < ?";
             $params[] = $gameCode;
-            $openIssue = $this->syncService->getCurrentIssue($gameCode, false)['issue_number'] ?? null;
-            if (!empty($openIssue)) {
-                $sql .= " AND b.issue_number < ?";
-                $params[] = $openIssue;
-            }
+            $params[] = $this->syncService->visibleBefore($gameCode);
         }
 
         return [$sql, $params];

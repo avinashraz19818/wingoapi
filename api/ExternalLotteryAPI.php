@@ -23,6 +23,19 @@ class ExternalLotteryAPI {
         'WinGo_10M' => 600,
     ];
 
+    /**
+     * Game block used by the provider inside the issue number.
+     * Real provider format: YYYYMMDD + 10001 + NNNN  (17 chars)
+     * e.g. 20260824100010884  ==  WinGo_1M period starting 14:43:00 IST on 2026-08-24
+     */
+    private array $gamePrefixes = [
+        'WinGo_30S' => '10003',
+        'WinGo_1M'  => '10001',
+        'WinGo_3M'  => '10002',
+        'WinGo_5M'  => '10004',
+        'WinGo_10M' => '10005',
+    ];
+
     public function __construct(?float $timeout = null, ?float $connectTimeout = null) {
         $this->timeout = $timeout ?? (defined('UPSTREAM_TIMEOUT') ? UPSTREAM_TIMEOUT : 3.0);
         $this->connectTimeout = $connectTimeout ?? (defined('UPSTREAM_CONNECT_TIMEOUT') ? UPSTREAM_CONNECT_TIMEOUT : 2.0);
@@ -218,20 +231,23 @@ class ExternalLotteryAPI {
     }
 
     /**
-     * Compute the provider's own issue number for the period that CONTAINS $timestamp.
+     * Issue number the provider uses for the period that CONTAINS $timestamp.
      *
-     * Real provider format (verified against stored draws): YYYYMMDD + 5-digit period index,
-     * e.g. WinGo_1M period 12:11:00-12:12:00 IST  ->  2026082300732
-     *      WinGo_30S period 12:11:30-12:12:00 IST ->  2026082301464
-     * The index is floor(secondsSinceMidnight / interval) + 1, so the first period of the day
-     * is 00001. Getting this wrong is fatal: a client would poll for an issue number the
-     * provider never publishes and its result would never arrive.
+     * Format: YYYYMMDD + 5-digit game block + 4-digit period index (17 chars total).
+     * Verified against real stored draws: WinGo_1M period starting 2026-08-24 14:43:00 IST
+     * -> index 884 -> "20260824100010884".
+     *
+     * NOTE: this is only a fallback for a brand-new installation with no stored draws. In normal
+     * operation the issue number always comes from the provider's own feed (see
+     * ResultSyncService::deriveActiveIssueNumber), because the provider's counter is not
+     * guaranteed to track the wall clock.
      */
     public function calculateIssueNumberForTime(string $gameCode, int $timestamp, ?int $interval = null): string {
         $interval = ($interval && $interval > 0) ? $interval : $this->getInterval($gameCode);
         $periodIndex = intdiv($this->secondsSinceLocalMidnight($timestamp), $interval) + 1;
+        $gamePrefix = $this->gamePrefixes[$gameCode] ?? '10001';
 
-        return date('Ymd', $timestamp) . sprintf('%05d', $periodIndex);
+        return date('Ymd', $timestamp) . $gamePrefix . sprintf('%04d', $periodIndex);
     }
 
     /**

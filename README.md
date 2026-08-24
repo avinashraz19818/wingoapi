@@ -27,15 +27,15 @@ result, the history list and the bet win/lose popup all waited for the *next* cr
 
 | Step | Behaviour |
 | --- | --- |
-| Period number | Derived from the **wall clock** (`floor(secondsSinceMidnight/interval)+1`), exactly like the provider numbers its own periods. Rollover is instant and never waits for a sync. |
-| History | Returns every **closed** period (`issue_number < open issue`) — the period that closed one second ago is included immediately. The still-open period stays hidden so its result can never leak early. |
+| Period number | Taken from the **provider's own feed** (`draw.ar-lottery01.com/.../GetHistoryIssuePage.json`) - never generated from our clock, because the provider's counter does not track it. We run **one period behind**, so the result of the period on screen is already stored before its timer ends. |
+| History | A draw becomes visible **the instant the window it arrived in closes**. So the result of the period whose timer just hit `00` shows up immediately instead of waiting for the next draw. The draw belonging to the still-running period stays hidden, so nothing leaks early. |
 | Result pull | `ResultSyncService::ensureLiveResult()` — if a period has just closed and its row is missing, the **first client request pulls it from the provider right away** instead of waiting for cron. Single-flight via `flock` + throttled (`LIVE_PULL_MIN_GAP`), so 1000 players cause exactly one upstream call. |
-| Settlement | Bets are settled in the **same request** that pulled the result (`BetService::ensureSettled()`), so the win/lose popup and wallet balance update together with the countdown. |
+| Settlement | A bet settles in the **same request** once its draw's window has closed (`BetService::ensureSettled()`), so the win/lose popup and wallet balance update together with the countdown. |
 | Worker | All games are fetched **in parallel** (`curl_multi`) with short timeouts, so one cycle costs the slowest call instead of the sum of all of them. |
 | Caching | Every JSON response sends `Cache-Control: no-store` so no browser/nginx/CDN can serve a stale history. |
 
-**Integrity guard:** a bet is only settled once its period has **closed**. A provider that publishes
-a result early can never settle (or reveal) a period that is still accepting bets.
+**Integrity guard:** a bet is only settled once the window its draw arrived in has **closed**. A
+provider that publishes a result early can never settle (or reveal) a period still accepting bets.
 
 ### Tuning (`.env`)
 
@@ -50,9 +50,9 @@ UPSTREAM_CONNECT_TIMEOUT=2
 UPSTREAM_FALLBACK=0       # 1 = invent fake results when the provider is down (settles real bets!)
 ```
 
-> **Note on `ISSUE_OFFSET`:** it used to default to `-1`, which is what put the displayed period one
-> step behind the provider and produced the delay. It now defaults to `0`. If your frontend was
-> built around the lagged numbering, set `ISSUE_OFFSET=-1` to restore it.
+> **Note on period numbering:** the numbers are the provider's own (17 chars,
+> `YYYYMMDD` + `10001` + `NNNN`, e.g. `20260824100010884`). `ISSUE_OFFSET` no longer changes
+> numbering — visibility is decided by *when a draw arrived*, which is what makes delivery instant.
 
 ---
 

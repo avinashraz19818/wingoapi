@@ -86,8 +86,7 @@ switch (strtolower($action)) {
     case 'gethistory':
     case 'history':
         $issue = $syncService->getCurrentIssue($gameCode);
-        $activeIssue = $issue['issue_number'] ?? null;
-        $history = $syncService->getHistory($gameCode, $pageSize, $activeIssue);
+        $history = $syncService->getHistory($gameCode, $pageSize, $issue['visible_before'] ?? null);
         $list = [];
         foreach ($history as $row) {
             $num = (int)$row['number'];
@@ -322,7 +321,7 @@ switch (strtolower($action)) {
 
     default:
         $issueInfo = $syncService->getCurrentIssue($gameCode);
-        $history = $syncService->getHistory($gameCode, $pageSize, $issueInfo['issue_number'] ?? null);
+        $history = $syncService->getHistory($gameCode, $pageSize, $issueInfo['visible_before'] ?? null);
         echo json_encode([
             'code' => 0,
             'msg' => 'Succeed',

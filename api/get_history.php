@@ -24,10 +24,10 @@ try {
     $pdo = DB::getConnection();
     $syncService = new ResultSyncService($pdo);
 
-    // Zero-delay: make sure the period that just closed is in the DB before answering, and
-    // hide only the period that is still open (never the newest closed draw).
+    // Zero-delay: getCurrentIssue() pulls the just-closed draw on demand, and history shows
+    // every draw whose window has closed - including the one that closed a moment ago.
     $issueData = $syncService->getCurrentIssue($gameCode);
-    $rawHistory = $syncService->getHistory($gameCode, $limit, $issueData['issue_number'] ?? null);
+    $rawHistory = $syncService->getHistory($gameCode, $limit, $issueData['visible_before'] ?? null);
 
     // Format fields in BOTH camelCase (issueNumber) and snake_case (issue_number)
     $formattedList = [];
