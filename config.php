@@ -93,14 +93,16 @@ return [
     'issue_offset' => ISSUE_OFFSET,
     // Period timing.
     'period' => [
-        // The provider hands over each result this many seconds BEFORE its own minute ends
-        // (it publishes 841 while 840 is still counting down). We shift our countdown by the
-        // same amount, so our rollover lands that many seconds ahead of the plain minute and
-        // the next result is always already stored when the timer hits 00.
-        // WinGo_1M with 2 => our periods tick at :58. Set RESULT_LEAD_SECONDS=0 to tick on
-        // the plain minute instead.
-        'result_lead_seconds' => (int)(getenv('RESULT_LEAD_SECONDS') !== false
-            ? getenv('RESULT_LEAD_SECONDS') : 2),
+        // Seconds past the plain minute at which our period ticks.
+        //
+        // Deliberately LATE. The period on screen follows the provider's newest stored draw the
+        // instant it lands, and the provider publishes a few seconds into each new minute - so
+        // ticking after it means the result is already showing while the last few seconds are
+        // still counting down, instead of turning up after the timer has hit zero.
+        // WinGo_1M default 8 => ticks at :08, ~5s of cushion. Raise it for more cushion
+        // (PERIOD_TICK_OFFSET=12 => :12), lower it to run closer to the provider.
+        'tick_offset_seconds' => (int)(getenv('PERIOD_TICK_OFFSET') !== false
+            ? getenv('PERIOD_TICK_OFFSET') : 8),
     ],
     'live_pull' => [
         'enabled'        => LIVE_PULL_ENABLED,

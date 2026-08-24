@@ -154,12 +154,12 @@ assertTest("Record without issue number is skipped", $zsync->persistResults('Win
 
 // 5c. Countdown phase. The provider hands the next result over 2s before its minute ends, so
 //     our periods must tick 2s early too - that is what removes the wait at the boundary.
-$lead = $zsync->resultLeadSeconds($interval);
-assertTest("Result lead is 2s (the provider publishes at :58)", $lead === 2, (string)$lead);
-assertTest("Phase offset = interval - lead", $zsync->phaseOffsetSeconds($interval) === 58, (string)$zsync->phaseOffsetSeconds($interval));
-assertTest("WinGo_30S gets its own 28s phase", $zsync->phaseOffsetSeconds(30) === 28, (string)$zsync->phaseOffsetSeconds(30));
+$tick = $zsync->tickOffsetSeconds($interval);
+assertTest("Tick offset is 8s past the minute", $tick === 8, (string)$tick);
+assertTest("Phase offset follows the tick offset", $zsync->phaseOffsetSeconds($interval) === 8, (string)$zsync->phaseOffsetSeconds($interval));
+assertTest("WinGo_30S gets its own 8s phase", $zsync->phaseOffsetSeconds(30) === 8, (string)$zsync->phaseOffsetSeconds(30));
 $ws = $zsync->windowStart($interval, $now);
-assertTest("Our window starts at :58, two seconds before the minute", (int)date('s', $ws) === 58, date('H:i:s', $ws));
+assertTest("Our window starts at :08, after the provider has published", (int)date('s', $ws) === 8, date('H:i:s', $ws));
 assertTest("Window start is in the past and less than a period old", $ws <= $now && ($now - $ws) < $interval, date('H:i:s', $ws) . " vs now " . date('H:i:s', $now));
 
 // 5d. The provider's feed with controlled arrival times:
@@ -221,7 +221,19 @@ $settleRollover = $zbets->ensureSettled('WinGo_1M');
 assertTest("Bet on the closed period settles at rollover", $settleRollover['settled_count'] === 1, json_encode($settleRollover));
 assertTest("Settled as a loss (C is 3, the bet was on 1)", $settleRollover['won_count'] === 0, json_encode($settleRollover));
 
-// 5g. Live pull is a no-op (no network) when the provider already published in this window.
+// 5g. The point of ticking late: a newly stored draw takes over the screen the INSTANT it
+//     lands, without waiting for the countdown. That is what puts the result on screen several
+//     seconds before the timer reaches zero.
+$preFlip = $zsync->getCurrentIssue('WinGo_1M', false);
+$early = '20260824100010885';
+$insDraw->execute([$early, 4, 'red', '4', 4, date('Y-m-d H:i:s', $now), $zsync->dbTime($now)]);
+$postFlip = $zsync->getCurrentIssue('WinGo_1M', false);
+assertTest("Newly stored draw takes over the screen immediately", $postFlip['issue_number'] === $early, $postFlip['issue_number']);
+assertTest("Countdown keeps running while the result is already showing", $postFlip['seconds_left'] >= 0 && $postFlip['seconds_left'] <= $interval, (string)$postFlip['seconds_left']);
+$histEarly = array_column($zsync->getHistory('WinGo_1M', 10, $postFlip['history_before_id']), 'issue_number');
+assertTest("Its result tops history at once, ahead of the timer", ($histEarly[0] ?? null) === $D, implode(',', $histEarly));
+
+// 5h. Live pull is a no-op (no network) when the provider has published since the last window.
 $pull = $zsync->ensureLiveResult('WinGo_1M');
 assertTest("Live pull short-circuits when this window already has a draw", $pull['needed'] === false && $pull['fresh'] === true, json_encode($pull));
 

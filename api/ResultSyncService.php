@@ -52,29 +52,27 @@ class ResultSyncService {
      * How many seconds before its own minute ends the provider hands over the next result.
      * Clamped so it can never eat the whole period.
      */
-    public function resultLeadSeconds(int $interval): int
-    {
-        $lead = (int)($this->config['period']['result_lead_seconds'] ?? 2);
-        if ($interval <= 1) {
-            return 0;
-        }
-        return max(0, min($lead, $interval - 1));
-    }
-
-    /**
-     * Seconds our period boundaries sit past the plain wall-clock minute.
-     *
-     * The provider publishes $lead seconds early, so we start counting $lead seconds early
-     * too: our countdown for a period begins the instant the provider publishes it and ends
-     * the instant it publishes the next one. For WinGo_1M with a 2s lead that is a 58s phase,
-     * i.e. our rollover lands at :58 - two seconds ahead of the plain minute.
-     */
-    public function phaseOffsetSeconds(int $interval): int
+    public function tickOffsetSeconds(int $interval): int
     {
         if ($interval <= 0) {
             return 0;
         }
-        return ($interval - $this->resultLeadSeconds($interval)) % $interval;
+        $offset = (int)($this->config['period']['tick_offset_seconds'] ?? 8);
+        return (($offset % $interval) + $interval) % $interval;
+    }
+
+    /**
+     * Seconds our period boundaries sit PAST the plain wall-clock minute.
+     *
+     * Deliberately late. The provider publishes a few seconds into each new minute, and the
+     * period on screen follows the newest stored draw the instant it lands - so ticking after
+     * the provider means the result is already on screen while the last few seconds are still
+     * counting down, instead of arriving after the timer has hit zero.
+     * WinGo_1M with the default 8 ticks at :08, which leaves ~5s of visible cushion.
+     */
+    public function phaseOffsetSeconds(int $interval): int
+    {
+        return $this->tickOffsetSeconds($interval);
     }
 
     /**
@@ -90,14 +88,17 @@ class ResultSyncService {
     }
 
     /**
-     * DB-clock bounds of the window containing $now: [start, start + interval + 1).
-     * Used to answer "did the provider publish anything during this period?".
+     * DB-clock bounds used to answer "is the provider still keeping up?".
+     *
+     * [start of the PREVIOUS window, end of this one). We tick after the provider, so the draw
+     * that belongs to this window normally lands a few seconds BEFORE it opens - counting only
+     * the current window would report everything as pending.
      *
      * @return array{0:string,1:string}
      */
     private function freshnessWindow(int $interval, int $now): array {
         $start = $this->windowStart($interval, $now);
-        return [$this->dbTime($start), $this->dbTime($start + $interval + 1)];
+        return [$this->dbTime($start - $interval), $this->dbTime($start + $interval + 1)];
     }
 
     /**
@@ -538,7 +539,7 @@ class ResultSyncService {
             $interval = $this->api->getInterval($gameCode); // never divide by zero on a bad row
         }
         $lockSeconds = isset($game['lock_seconds']) ? (int)$game['lock_seconds'] : 5;
-        $leadSeconds = $this->resultLeadSeconds($interval);
+        $tickOffset = $this->tickOffsetSeconds($interval);
 
         $now = time();
         $currentStartTs = $this->windowStart($interval, $now);
@@ -559,12 +560,16 @@ class ResultSyncService {
         // provider's counter does not track our time (it has been seen jumping backwards).
         $openRow = $this->newestRow($gameCode);
 
+        // "Is the provider keeping up?" - defined once, used by every branch below.
+        [$freshFrom, ] = $this->freshnessWindow($interval, $now);
+
         if ($openRow !== null) {
             $currentIssue = (string)$openRow['issue_number'];
             $openRowId    = (int)$openRow['id'];
-            // Pending means the provider has not published anything during this window yet, so
-            // the period on screen is the previous one running over.
-            $resultPending = ((string)$openRow['fetched_at']) < $this->dbTime($currentStartTs);
+            // Pending means the provider has gone quiet: nothing has arrived since the previous
+            // window opened, so the period on screen is one running over. (We tick after the
+            // provider, so the draw for this window normally lands just before it opens.)
+            $resultPending = ((string)$openRow['fetched_at']) < $freshFrom;
         } else {
             // No stored draws at all (fresh install): fall back to the clock-derived number.
             $currentIssue  = $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs, $interval);
@@ -579,7 +584,7 @@ class ResultSyncService {
             if ($row !== null) {
                 $currentIssue  = (string)$row['issue_number'];
                 $openRowId     = (int)$row['id'];
-                $resultPending = ((string)$row['fetched_at']) < $this->dbTime($currentStartTs);
+                $resultPending = ((string)$row['fetched_at']) < $freshFrom;
                 $nextIssue     = $this->deriveNextIssueNumber($currentIssue);
             } else {
                 $resultPending = empty($pull['fresh']);
@@ -599,7 +604,7 @@ class ResultSyncService {
             'game_name' => $game['name'],
             'interval' => $interval,
             'lock_seconds' => $lockSeconds,
-            'result_lead_seconds' => $leadSeconds,
+            'tick_offset_seconds' => $tickOffset,
             'issue_number' => $currentIssue,
             'start_time' => date('Y-m-d H:i:s', $currentStartTs),
             'end_time' => date('Y-m-d H:i:s', $currentEndTs),
