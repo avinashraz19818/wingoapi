@@ -471,29 +471,51 @@ class ResultSyncService {
         $currentStartTs = $now - ($now % $interval);
         $currentEndTs = $currentStartTs + $interval;
 
-        // The period number ALWAYS comes from the provider's own feed (newest stored draw).
-        // The provider's counter does not track our wall clock - it has been seen jumping
-        // backwards - so deriving it from the clock would hand clients issue numbers that
-        // never match a real draw and bets would never settle.
-        $currentIssue = $this->deriveActiveIssueNumber($gameCode, $currentStartTs, $interval);
+        // ONE PERIOD BEHIND THE PROVIDER, on purpose.
+        //
+        // The period shown to the player is the newest draw that arrived at least one full
+        // window ago. Its result is therefore already stored, and so is the result of the
+        // period after it - so when the countdown hits 00 the reveal and the rollover are
+        // pure local reads: no network round-trip, no waiting.
+        //
+        // The number itself always comes from the provider's feed, never from our clock: the
+        // provider's counter does not track our time (it has been seen jumping backwards).
+        $prevWindowStartTs = $currentStartTs - $interval;
+        $openRow = $this->latestRowBefore($gameCode, $this->dbTime($prevWindowStartTs));
+
+        if ($openRow !== null) {
+            $currentIssue = (string)$openRow['issue_number'];
+            $openRowId = (int)$openRow['id'];
+        } else {
+            // Not enough stored history yet (fresh install): newest draw, else clock fallback.
+            $currentIssue = $this->latestStoredIssue($gameCode)
+                ?? $this->api->calculateIssueNumberForTime($gameCode, $currentStartTs, $interval);
+            $openRowId = null;
+        }
         $nextIssue = $this->deriveNextIssueNumber($currentIssue);
 
         $secondsLeft = max(0, $currentEndTs - $now);
         $isLocked = ($secondsLeft <= $lockSeconds);
 
-        // Visibility is decided by WHEN a draw arrived, not by its number:
-        // a draw that landed during the previous window belongs to a closed period, so it is
-        // revealed the instant the countdown hits 00 - no waiting for the next sync cycle.
+        // History shows everything OLDER than the period on screen. The period being bet on and
+        // the draws already known ahead of it stay hidden, so a result can never be seen before
+        // its countdown ends - and it appears the instant it does.
+        $prevWindowStart = $this->dbTime($prevWindowStartTs);
         $visibleBefore = $this->dbTime($currentStartTs);
-        $prevWindowStart = $this->dbTime($currentStartTs - $interval);
 
-        $revealedIssue = $this->latestIssueBefore($gameCode, $visibleBefore);
+        $revealedIssue = $openRowId !== null ? $this->issueBeforeId($gameCode, $openRowId) : null;
         $resultPending = !$this->hasDrawInWindow($gameCode, $prevWindowStart, $visibleBefore);
 
         if ($autoPull && $resultPending) {
             $pull = $this->ensureLiveResult($gameCode);
             $resultPending = empty($pull['fresh']);
-            $revealedIssue = $this->latestIssueBefore($gameCode, $visibleBefore);
+            $openRow = $this->latestRowBefore($gameCode, $prevWindowStart);
+            if ($openRow !== null) {
+                $currentIssue = (string)$openRow['issue_number'];
+                $openRowId = (int)$openRow['id'];
+                $nextIssue = $this->deriveNextIssueNumber($currentIssue);
+                $revealedIssue = $this->issueBeforeId($gameCode, $openRowId);
+            }
         }
 
         return [
@@ -508,6 +530,7 @@ class ResultSyncService {
             'next_start_time' => date('Y-m-d H:i:s', $currentEndTs),
             'next_end_time' => date('Y-m-d H:i:s', $currentEndTs + $interval),
             'last_issue_number' => $revealedIssue,
+            'history_before_id' => $openRowId,
             'visible_before' => $visibleBefore,
             'result_pending' => $resultPending,
             'result_available' => !$resultPending,
@@ -519,12 +542,47 @@ class ResultSyncService {
     }
 
     /**
-     * DB-clock boundary: draws fetched before this are visible / settleable.
+     * Id of the row that is currently on screen (the period open for betting).
+     * Draws with a lower id are visible / settleable; that row and everything newer are not.
      */
-    public function visibleBefore(string $gameCode): string {
+    public function openRowId(string $gameCode): ?int {
         $interval = $this->getIntervalSeconds($gameCode);
         $now = time();
-        return $this->dbTime($now - ($now % $interval));
+        $currentStartTs = $now - ($now % $interval);
+        $row = $this->latestRowBefore($gameCode, $this->dbTime($currentStartTs - $interval));
+        return $row === null ? null : (int)$row['id'];
+    }
+
+    /**
+     * Newest draw that arrived strictly before $before (DB clock).
+     */
+    private function latestRowBefore(string $gameCode, string $before): ?array {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, issue_number FROM wingo_results WHERE game_code = ? AND fetched_at < ? ORDER BY id DESC LIMIT 1"
+            );
+            $stmt->execute([$gameCode, $before]);
+            $row = $stmt->fetch();
+            return $row ?: null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Issue number of the draw immediately older than $id (the current top of history).
+     */
+    private function issueBeforeId(string $gameCode, int $id): ?string {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT issue_number FROM wingo_results WHERE game_code = ? AND id < ? ORDER BY id DESC LIMIT 1"
+            );
+            $stmt->execute([$gameCode, $id]);
+            $issue = $stmt->fetchColumn();
+            return $issue === false ? null : (string)$issue;
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     private function hasDrawInWindow(string $gameCode, string $from, string $to): bool {
@@ -610,31 +668,32 @@ class ResultSyncService {
     /**
      * Get historical draw results.
      *
-     * Visibility rule: a draw becomes visible as soon as the window it arrived in has closed.
-     * That is what removes the old delay - previously the newest row stayed hidden until the
-     * NEXT period was synced, so history and the bet popup lagged ~5s behind the countdown.
-     * The draw belonging to the still-running period stays hidden, so nothing leaks early.
+     * Visibility rule: everything older than the period currently on screen is visible. Because
+     * we run one period behind the provider, the next result is already stored - so the moment
+     * the countdown hits 00 the new row is at the top of history with no network round-trip.
      *
-     * @param string|null $visibleBefore DB-clock boundary (defaults to the current window start)
+     * @param int|null $beforeId exclude this row and everything newer (the period on screen)
      */
-    public function getHistory(string $gameCode, int $limit = 50, ?string $visibleBefore = null): array {
+    public function getHistory(string $gameCode, int $limit = 50, ?int $beforeId = null): array {
         $limit = max(1, min(200, $limit));
-        $visibleBefore = $visibleBefore ?? $this->visibleBefore($gameCode);
+        $beforeId = $beforeId ?? $this->openRowId($gameCode);
 
-        $stmt = $this->pdo->prepare("
-            SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
-            FROM wingo_results
-            WHERE game_code = ? AND fetched_at < ?
-            ORDER BY id DESC
-            LIMIT ?
-        ");
-        $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
-        $stmt->bindValue(2, $visibleBefore, PDO::PARAM_STR);
-        $stmt->bindValue(3, $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        $history = $stmt->fetchAll();
-        if (!empty($history)) {
-            return $history;
+        if ($beforeId !== null) {
+            $stmt = $this->pdo->prepare("
+                SELECT issue_number, number, color, premium, sum, draw_time, fetched_at
+                FROM wingo_results
+                WHERE game_code = ? AND id < ?
+                ORDER BY id DESC
+                LIMIT ?
+            ");
+            $stmt->bindValue(1, $gameCode, PDO::PARAM_STR);
+            $stmt->bindValue(2, $beforeId, PDO::PARAM_INT);
+            $stmt->bindValue(3, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $history = $stmt->fetchAll();
+            if (!empty($history)) {
+                return $history;
+            }
         }
 
         // Nothing visible yet (fresh install, or the provider is lagging): show the newest

@@ -106,12 +106,14 @@ assertTest("Get history returns items", count($history) > 0);
 
 // =========================================================================
 // 5. ZERO-DELAY REGRESSION SUITE
-//    Hermetic: runs against a throwaway SQLite DB so the live data file is untouched.
+//    Hermetic: throwaway SQLite DB, so the live data file is never touched.
 //
 //    Model under test (what production must do):
 //      - the period number ALWAYS comes from the provider's own feed, never from our clock
-//      - we run one period behind, so the result of the displayed period is already stored
-//      - a draw becomes visible the instant the window it arrived in closes
+//      - we run ONE PERIOD BEHIND the provider's newest draw, so the result of the period on
+//        screen (and of the one after it) is already stored before the countdown ends
+//      - history shows everything older than the period on screen, so nothing leaks early and
+//        the reveal at 00 is a pure local read - no network round-trip
 // =========================================================================
 echo "\n--- 5. Zero-Delay Issue / History / Settlement ---\n";
 
@@ -126,20 +128,21 @@ $zsync = new ResultSyncService($tpdo);
 $zbets = new BetService($tpdo);
 $zapi = $zsync->getApi();
 
-// 5a. Issue number format must match the real provider feed.
-//     Reference: production DB row 20260824100010884 has draw_time 2026-08-24 14:43:30,
-//     i.e. the WinGo_1M period starting 14:43:00 IST -> index 884.
+// 5a. Issue format must match the real provider feed.
+//     Production row 20260824100010884 has draw_time 2026-08-24 14:43:30 IST, i.e. the
+//     WinGo_1M period starting 14:43:00 -> index 884.
 $refIssue = $zapi->calculateIssueNumberForTime('WinGo_1M', strtotime('2026-08-24 14:43:00'));
 assertTest("Issue number uses provider format YYYYMMDD+10001+NNNN", strlen($refIssue) === 17, "got '{$refIssue}' (len " . strlen($refIssue) . ")");
 assertTest("Issue matches real provider draw 20260824100010884", $refIssue === '20260824100010884', "got {$refIssue}");
 
 $interval = 60;
 $now = time();
-$bucket = $now - ($now % $interval);      // start of the window we are in
-$prevStart = $bucket - $interval;         // start of the window that just closed
+$bucket = $now - ($now % $interval);          // start of the window we are in
+$prevStart = $bucket - $interval;             // start of the window that just closed
+$prev2Start = $bucket - (2 * $interval);      // start of the window before that
 
-// 5b. Writing provider batches: portable insert + newest row must end up with the highest id.
-//     Providers send the list NEWEST first; we must store it so that ORDER BY id DESC = newest.
+// 5b. Storing a provider batch: portable insert, and the newest draw must get the highest id.
+//     Providers send the list NEWEST first.
 $batch = [
     ['issueNumber' => '20260824100010890', 'number' => 5, 'color' => 'green,violet'],
     ['issueNumber' => '20260824100010889', 'number' => 2, 'color' => 'red'],
@@ -151,49 +154,64 @@ $second = $zsync->persistResults('WinGo_1M', $batch);
 assertTest("Duplicate draw ignored instead of erroring", $second['saved'] === 0 && $second['skipped_duplicates'] === 2, json_encode($second));
 assertTest("Record without issue number is skipped", $zsync->persistResults('WinGo_1M', [['number' => 3]])['invalid'] === 1);
 
-// 5c. Two draws with controlled arrival times:
-//     P arrived during the PREVIOUS window (closed) -> must be visible now
-//     C arrived during the CURRENT window (still betting) -> must stay hidden
-$P = '20260824100010884';
-$C = '20260824100010885';
+// 5c. Four draws with controlled arrival times:
+//       A,B -> arrived two windows ago   (B is the newest of them -> B goes on screen)
+//       C   -> arrived during the previous window (already stored, ready for the next rollover)
+//       D   -> arrived during the current window (the provider's newest)
+$A = '20260824100010881';
+$B = '20260824100010882';
+$C = '20260824100010883';
+$D = '20260824100010884';
 $insDraw = $tpdo->prepare("INSERT INTO wingo_results (game_code, issue_number, number, color, premium, sum, draw_time, fetched_at) VALUES ('WinGo_1M', ?, ?, ?, ?, ?, ?, ?)");
-$insDraw->execute([$P, 7, 'green', '7', 7, date('Y-m-d H:i:s', $prevStart), $zsync->dbTime($prevStart)]);
-$insDraw->execute([$C, 3, 'green', '3', 3, date('Y-m-d H:i:s', $bucket), $zsync->dbTime($bucket)]);
+$insDraw->execute([$A, 1, 'green', '1', 1, date('Y-m-d H:i:s', $prev2Start), $zsync->dbTime($prev2Start)]);
+$insDraw->execute([$B, 7, 'green', '7', 7, date('Y-m-d H:i:s', $prev2Start + 1), $zsync->dbTime($prev2Start + 1)]);
+$insDraw->execute([$C, 3, 'green', '3', 3, date('Y-m-d H:i:s', $prevStart), $zsync->dbTime($prevStart)]);
+$insDraw->execute([$D, 5, 'green,violet', '5', 5, date('Y-m-d H:i:s', $bucket), $zsync->dbTime($bucket)]);
+
+$rowId = function (string $issue) use ($tpdo): int {
+    $st = $tpdo->prepare("SELECT id FROM wingo_results WHERE game_code = 'WinGo_1M' AND issue_number = ?");
+    $st->execute([$issue]);
+    return (int)$st->fetchColumn();
+};
 
 $current = $zsync->getCurrentIssue('WinGo_1M', false);
-assertTest("Open issue comes from the provider feed, not our clock", $current['issue_number'] === $C, $current['issue_number']);
+assertTest("Screen shows one period behind the provider's newest draw", $current['issue_number'] === $B, $current['issue_number'] . " (provider newest is {$D})");
 assertTest("seconds_left inside the interval", $current['seconds_left'] >= 0 && $current['seconds_left'] <= $interval, (string)$current['seconds_left']);
+assertTest("Result of the period on screen is already stored", $zsync->getResult('WinGo_1M', $B) !== null);
+assertTest("Next period's result is already stored too (nothing to wait for at 00)", $zsync->getResult('WinGo_1M', $C) !== null);
+assertTest("Nothing pending while the provider keeps up", $current['result_pending'] === false, json_encode($current['result_pending']));
 
-$histNow = array_column($zsync->getHistory('WinGo_1M', 10, $current['visible_before']), 'issue_number');
-assertTest("Previous window's draw is visible immediately", in_array($P, $histNow, true), implode(',', $histNow));
-assertTest("Current window's draw is NOT leaked while betting is open", !in_array($C, $histNow, true), implode(',', $histNow));
+$histNow = array_column($zsync->getHistory('WinGo_1M', 10, $current['history_before_id']), 'issue_number');
+assertTest("History top is the period before the one on screen", ($histNow[0] ?? null) === $A, implode(',', $histNow));
+assertTest("Period on screen is NOT leaked into history", !in_array($B, $histNow, true), implode(',', $histNow));
+assertTest("Draws known ahead are NOT leaked either", !in_array($C, $histNow, true) && !in_array($D, $histNow, true), implode(',', $histNow));
 
-// The moment the timer ends, the boundary moves one window forward -> C shows up at once.
-$histAfter = array_column($zsync->getHistory('WinGo_1M', 10, $zsync->dbTime($bucket + $interval)), 'issue_number');
-assertTest("Draw appears in history the instant the timer ends", $histAfter[0] === $C, implode(',', $histAfter));
+// At 00 the screen moves to C and B is revealed - both are local reads, no upstream call.
+$histAfter = array_column($zsync->getHistory('WinGo_1M', 10, $rowId($C)), 'issue_number');
+assertTest("Result appears in history the instant the timer ends", ($histAfter[0] ?? null) === $B, implode(',', $histAfter));
 
-// 5d. Settlement follows the same rule: closed window settles now, open window never early.
+// 5d. Settlement fires exactly when the player can see the result - never before.
 $zbets->deposit(9998, 1000.0);
 $balanceBefore = $zbets->getWallet(9998)['balance'];
 $insBet = $tpdo->prepare("INSERT INTO wingo_bets (user_id, game_code, issue_number, bet_type, bet_value, amount, odds, status, payout) VALUES (9998, 'WinGo_1M', ?, 'number', ?, 100, 9, 'pending', 0)");
-$insBet->execute([$P, '7']);
-$settleClosed = $zbets->ensureSettled('WinGo_1M');
-assertTest("Closed-window bet settles in the same request", $settleClosed['settled_count'] === 1 && $settleClosed['won_count'] === 1, json_encode($settleClosed));
-assertTest("Payout applies 9x odds minus 2% fee", abs($settleClosed['total_payout'] - 882.0) < 0.001, (string)$settleClosed['total_payout']);
+$insBet->execute([$A, '1']);
+$settleRevealed = $zbets->ensureSettled('WinGo_1M');
+assertTest("Bet on a revealed period settles in the same request", $settleRevealed['settled_count'] === 1 && $settleRevealed['won_count'] === 1, json_encode($settleRevealed));
+assertTest("Payout applies 9x odds minus 2% fee", abs($settleRevealed['total_payout'] - 882.0) < 0.001, (string)$settleRevealed['total_payout']);
 assertTest(
     "Wallet credited in the same request",
     abs($zbets->getWallet(9998)['balance'] - ($balanceBefore + 882.0)) < 0.001,
     $zbets->getWallet(9998)['balance'] . " vs expected " . ($balanceBefore + 882.0)
 );
 
-$insBet->execute([$C, '3']);
+$insBet->execute([$B, '7']);
 $settleOpen = $zbets->ensureSettled('WinGo_1M');
-assertTest("Open-window bet stays pending (no early settlement)", $settleOpen['settled_count'] === 0, json_encode($settleOpen));
-assertTest("Settleable count ignores the open window", $zbets->countSettleableBets('WinGo_1M') === 0, (string)$zbets->countSettleableBets('WinGo_1M'));
+assertTest("Bet on the period still on screen stays pending", $settleOpen['settled_count'] === 0, json_encode($settleOpen));
+assertTest("Settleable count ignores the period on screen", $zbets->countSettleableBets('WinGo_1M') === 0, (string)$zbets->countSettleableBets('WinGo_1M'));
 
-// 5e. Live pull must be a no-op (no network) when the closed window already has a draw.
+// 5e. Live pull is a no-op (no network) when the previous window already delivered a draw.
 $pull = $zsync->ensureLiveResult('WinGo_1M');
-assertTest("Live pull short-circuits when the closed window already has a draw", $pull['needed'] === false && $pull['fresh'] === true, json_encode($pull));
+assertTest("Live pull short-circuits when a draw already arrived last window", $pull['needed'] === false && $pull['fresh'] === true, json_encode($pull));
 
 @unlink($tmpDb);
 

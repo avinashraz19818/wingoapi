@@ -27,7 +27,7 @@ try {
     // Zero-delay: getCurrentIssue() pulls the just-closed draw on demand, and history shows
     // every draw whose window has closed - including the one that closed a moment ago.
     $issueData = $syncService->getCurrentIssue($gameCode);
-    $rawHistory = $syncService->getHistory($gameCode, $limit, $issueData['visible_before'] ?? null);
+    $rawHistory = $syncService->getHistory($gameCode, $limit, $issueData['history_before_id'] ?? null);
 
     // Format fields in BOTH camelCase (issueNumber) and snake_case (issue_number)
     $formattedList = [];

@@ -247,9 +247,15 @@ class BetService {
         $params = [];
 
         if ($gameCode !== null) {
-            $sql .= " AND b.game_code = ? AND r.fetched_at < ?";
+            $openRowId = $this->syncService->openRowId($gameCode);
+            $sql .= " AND b.game_code = ?";
             $params[] = $gameCode;
-            $params[] = $this->syncService->visibleBefore($gameCode);
+            if ($openRowId !== null) {
+                // Settle once the draw is older than the period on screen - exactly when the
+                // player can see it in history, never before.
+                $sql .= " AND r.id < ?";
+                $params[] = $openRowId;
+            }
         }
 
         return [$sql, $params];
