@@ -153,7 +153,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/php ${INSTALL_DIR}/cron/sync_worker.php --daemon --sleep=5
+ExecStart=/usr/bin/php ${INSTALL_DIR}/cron/sync_worker.php --daemon --sleep=2
 Restart=always
 RestartSec=5
 
