@@ -43,7 +43,7 @@ final class Jwt
     }
 
     /**
-     * @return array{id:int,mobile:string,exp:int}
+     * @return array{id:int,mobile:string,exp:int}&array<string,mixed>
      */
     public function verify(string $token): array
     {
@@ -79,7 +79,7 @@ final class Jwt
             throw ApiException::auth('Token has expired');
         }
 
-        return [
+        return $payload + [
             'id'     => $userId,
             'mobile' => (string) ($payload['mobile'] ?? ''),
             'exp'    => $exp,

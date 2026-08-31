@@ -102,7 +102,12 @@ function makeTestApp(array $overrides = []): App
     $config['auth']['jwt_secret']       = 'test-jwt-secret';
     $config['auth']['signature_secret'] = 'test-signature-secret';
     $config['security']['admin_token']  = 'test-admin-token';
+    $config['security']['rate_limit']       = 120;
+    $config['security']['rate_limit_window']= 60;
+    $config['security']['cors_origins']     = ['*'];
     $config['security']['rate_limit_store'] = sys_get_temp_dir() . '/lottery-test-rl-' . bin2hex(random_bytes(4));
+    $config['admin'] = ['user' => 'admin', 'password' => 'test-admin-password', 'session_ttl' => 3600, 'enabled' => true];
+    $config['auth']['require_signature']    = false;
 
     foreach ($overrides as $key => $value) {
         $config = array_replace_recursive($config, [$key => $value]);
@@ -140,6 +145,7 @@ $files = [
     __DIR__ . '/TrendTest.php',
     __DIR__ . '/AuthTest.php',
     __DIR__ . '/ApiTest.php',
+    __DIR__ . '/AdminTest.php',
 ];
 
 foreach ($files as $file) {

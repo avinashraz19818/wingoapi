@@ -3,6 +3,8 @@
  * Single entrypoint / router.
  *
  *   /api/Lottery      -> the SaaS Lottery API (see docs/API.md)
+ *   /api/Admin        -> admin panel API (see docs/ADMIN.md)
+ *   /admin            -> admin web panel (SPA)
  *   /health           -> liveness probe
  *   /                 -> service banner
  *
@@ -13,6 +15,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
+use Lottery\Api\AdminKernel;
 use Lottery\Api\Kernel;
 use Lottery\App;
 use Lottery\Support\Response;
@@ -47,6 +50,26 @@ if ($uri === '' || preg_match('#^/(api/)?lottery$#i', $uri)) {
     }
 
     (new Kernel($app))->handle();
+    exit;
+}
+
+/* ---------------------------------------------------- admin panel API */
+if (preg_match('#^/api/admin$#i', $uri)) {
+    (new AdminKernel($app))->handle();
+    exit;
+}
+
+// Admin web panel (static SPA shell; every data call is authenticated separately).
+if (preg_match('#^/(admin|panel|admin-panel)$#i', $uri)) {
+    if (!$app->config('admin.enabled')) {
+        Security::applyHeaders((array) $app->config('security'));
+        Response::send(Response::error('Admin panel is disabled', Response::ERR_AUTH, 'AUTH_REQUIRED'), 403);
+        exit;
+    }
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    readfile(__DIR__ . '/panel/index.html');
     exit;
 }
 

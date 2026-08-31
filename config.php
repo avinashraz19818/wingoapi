@@ -159,6 +159,15 @@ return [
         'admin_token'       => Env::get('ADMIN_TOKEN', ''),
     ],
 
+    /* ------------------------------------------------------- admin panel */
+    'admin' => [
+        'user'        => Env::get('ADMIN_USER', 'admin'),
+        // Password for the web panel. Falls back to ADMIN_TOKEN when unset.
+        'password'    => Env::get('ADMIN_PASSWORD', Env::get('ADMIN_TOKEN', '')),
+        'session_ttl' => (int) Env::get('ADMIN_SESSION_TTL', '28800'),
+        'enabled'     => Env::bool('ADMIN_PANEL_ENABLED', true),
+    ],
+
     /* --------------------------------------------------------------- logging */
     'log' => [
         'path'  => Env::get('LOG_PATH', __DIR__ . '/data/app.log'),

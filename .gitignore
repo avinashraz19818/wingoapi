@@ -12,6 +12,8 @@ data/*.sqlite-*
 data/*.log
 *.log
 data/rate-limit/
+data/rl/
+data/*.sqlite-gen
 
 # Tooling
 node_modules/

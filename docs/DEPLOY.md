@@ -106,7 +106,22 @@ Without systemd, use `deploy/crontab.example` (six staggered passes per minute).
 The API also settles lazily when history/records/win-loss are requested, so a
 short worker outage never blocks payouts — it only delays them.
 
-### 2.6 Timezone
+### 2.6 Admin panel
+
+The console is served by the same vhost at `https://your.domain/admin`.
+
+```ini
+ADMIN_PANEL_ENABLED=true
+ADMIN_USER=admin
+ADMIN_PASSWORD=$(openssl rand -hex 20)
+ADMIN_SESSION_TTL=28800
+```
+
+For production, restrict it to known networks — uncomment the `allow`/`deny`
+lines in `deploy/nginx.conf` under `location = /admin` and
+`location ^~ /panel/assets/`. See [`ADMIN.md`](ADMIN.md) for the full tour.
+
+### 2.7 Timezone
 
 ```bash
 sudo timedatectl set-timezone Asia/Kolkata
@@ -142,6 +157,7 @@ curl -s -X POST "https://your.domain/api/Lottery?action=WinGoBet" \
 | Force a result | `POST ?action=SetResultOverride` with `X-Admin-Token` |
 | Manual settlement | `POST ?action=SettleIssue` with `X-Admin-Token` |
 | Run the test suite | `php tests/run.php` |
+| Admin panel | `https://your.domain/admin` (see [ADMIN.md](ADMIN.md)) |
 
 Application log: `data/app.log` (one JSON object per line — ship it to your log
 stack). Worker log: `journalctl -u lottery-worker`.
@@ -178,5 +194,6 @@ request after a deploy also self-heals the schema if the CLI step was skipped.
 - [ ] TLS with HSTS enabled (Certbot renew timer active)
 - [ ] MySQL bound to `127.0.0.1`, dedicated user, no wildcard grants
 - [ ] `RATE_LIMIT_PER_MIN` tuned; `TRUSTED_PROXIES` set if behind a CDN/LB
+- [ ] `ADMIN_PASSWORD` is long and unique; panel restricted by IP where possible
 - [ ] `data/` is writable only by `www-data` and not web-reachable
 - [ ] Off-host database backups scheduled and restore-tested

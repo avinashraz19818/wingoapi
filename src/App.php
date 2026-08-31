@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lottery;
 
 use Lottery\Admin\OverrideService;
+use Lottery\Auth\AdminAuth;
 use Lottery\Auth\Authenticator;
 use Lottery\Auth\Jwt;
 use Lottery\Auth\Signature;
@@ -225,6 +226,15 @@ class App
             $this->db(),
             $this->jwt(),
             $this->wallet()
+        ));
+    }
+
+    public function adminAuth(): AdminAuth
+    {
+        return $this->singleton(AdminAuth::class, fn() => new AdminAuth(
+            (string) $this->config('auth.jwt_secret'),
+            (array) $this->config('admin', []),
+            (string) $this->config('security.admin_token')
         ));
     }
 

@@ -389,6 +389,20 @@ class Migrator
             ){ENGINE}',
         ];
 
+        /* ------------------------------------- v3: admin panel audit trail */
+        $m[3] = [
+            'CREATE TABLE IF NOT EXISTS ' . Tables::AUDIT . ' (
+                id {PK},
+                actor VARCHAR(64) NOT NULL,
+                action VARCHAR(48) NOT NULL,
+                target VARCHAR(64) NULL,
+                detail {TEXT} NULL,
+                ip VARCHAR(45) NULL,
+                created_at {DATETIME} NOT NULL DEFAULT {NOW}
+            ){ENGINE}',
+            'CREATE INDEX idx_audit_created ON ' . Tables::AUDIT . ' (id)',
+        ];
+
         return $m;
     }
 
