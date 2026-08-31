@@ -1,19 +1,21 @@
-# Environment & sensitive credentials
+# Environment & secrets
 .env
+*.pem
+*.key
 
-# Database & SQLite files
+# Local databases
 data/*.sqlite
-data/*.sqlite-journal
-data/*.sqlite-wal
-data/*.sqlite-shm
+data/*.sqlite-*
 *.db
-*.sqlite
 
-# Logs
+# Logs & runtime
+data/*.log
 *.log
-cron/*.log
+data/rate-limit/
 
-# IDEs & System
-.DS_Store
+# Tooling
+node_modules/
+vendor/
 .idea/
 .vscode/
+.DS_Store

@@ -1,0 +1,8 @@
+# Alternative to the systemd worker: run one pass a minute (plus 6 staggered
+# passes so 30s/1m games settle promptly). Use EITHER this OR lottery-worker.service.
+* * * * * www-data /usr/bin/php /var/www/lottery-api/cron/worker.php --once --quiet >> /var/log/lottery-worker.log 2>&1
+* * * * * www-data sleep 10; /usr/bin/php /var/www/lottery-api/cron/worker.php --once --quiet
+* * * * * www-data sleep 20; /usr/bin/php /var/www/lottery-api/cron/worker.php --once --quiet
+* * * * * www-data sleep 30; /usr/bin/php /var/www/lottery-api/cron/worker.php --once --quiet
+* * * * * www-data sleep 40; /usr/bin/php /var/www/lottery-api/cron/worker.php --once --quiet
+* * * * * www-data sleep 50; /usr/bin/php /var/www/lottery-api/cron/worker.php --once --quiet
