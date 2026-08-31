@@ -182,3 +182,45 @@ TestRunner::equals('TRX digit from last numeric char of the hash', 3, $trxResult
 TestRunner::equals('TRX keeps the block height', '65123456', $trxResult['result']['blockHeight']);
 
 Clock::unfreeze();
+
+TestRunner::group('Draws — provider back-off & placeholder host');
+
+$placeholderApp = makeTestApp(['draw_base_url' => 'https://draw.yourdomain.com']);
+TestRunner::ok('sample provider host disables remote fetching', $placeholderApp->fetcher()->enabled() === false);
+
+$offApp = makeTestApp(['draw_enabled' => false, 'draw_base_url' => 'https://draw.example.net']);
+TestRunner::ok('DRAW_ENABLED=false disables remote fetching', $offApp->fetcher()->enabled() === false);
+
+$onApp = makeTestApp(['draw_base_url' => 'https://draw.example.net']);
+TestRunner::ok('a real provider host stays enabled', $onApp->fetcher()->enabled() === true);
+
+// The placeholder path still produces results locally.
+Clock::freeze(strtotime('2026-08-31 12:05:30'));
+$pg    = $placeholderApp->registry()->get('WinGo_1M');
+$pIssue = $placeholderApp->scheduler()->previous($pg);
+TestRunner::equals('local draw still resolves without a provider', 'local',
+    $placeholderApp->draws()->ensureResult($pg, $pIssue)['source']);
+
+/** Counts how many times the transport is actually hit. */
+final class CountingHttp extends \Lottery\Support\Http
+{
+    public int $calls = 0;
+    public function __construct() { parent::__construct(1); }
+    public function fetchArray(string $url, array $headers = []): ?array { $this->calls++; return null; }
+}
+
+$counter = new CountingHttp();
+$backoff = new \Lottery\Draw\DrawFetcher($counter, new RulesFactory(), 'https://draw.example.net', '{base}/{game}/{interval}.json', true, 60);
+$gameA   = $onApp->registry()->get('WinGo_1M');
+
+$backoff->fetchIssue($gameA, '20260831100010001');
+$backoff->flush();                       // clear the per-request memo only
+$backoff->fetchIssue($gameA, '20260831100010002');
+TestRunner::equals('failing endpoint is not retried during the cooldown', 1, $counter->calls);
+
+Clock::freeze(Clock::now() + 120);
+$backoff->flush();
+$backoff->fetchIssue($gameA, '20260831100010003');
+TestRunner::equals('endpoint is retried after the cooldown expires', 2, $counter->calls);
+
+Clock::unfreeze();

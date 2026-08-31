@@ -6,6 +6,7 @@ namespace Lottery\Draw;
 
 use Lottery\Games\Families\RulesFactory;
 use Lottery\Games\GameDefinition;
+use Lottery\Support\Clock;
 use Lottery\Support\Http;
 use Lottery\Support\Log;
 
@@ -25,15 +26,47 @@ class DrawFetcher
     private string $baseUrl;
     private string $template;
     private RulesFactory $rules;
+    private bool $enabled;
+    private int $cooldown;
     /** @var array<string,array<string,array>> in-request memo: url => rows */
     private array $memo = [];
+    /** @var array<string,int> url => unix ts until which we skip the provider */
+    private array $cooldownUntil = [];
 
-    public function __construct(Http $http, RulesFactory $rules, string $baseUrl, string $template)
-    {
+    public function __construct(
+        Http $http,
+        RulesFactory $rules,
+        string $baseUrl,
+        string $template,
+        bool $enabled = true,
+        int $cooldown = 60
+    ) {
         $this->http     = $http;
         $this->rules    = $rules;
         $this->baseUrl  = rtrim($baseUrl, '/');
         $this->template = $template;
+        $this->cooldown = max(0, $cooldown);
+        $this->enabled  = $enabled && $this->baseUrl !== '' && !self::isPlaceholder($this->baseUrl);
+    }
+
+    /**
+     * Placeholder hosts from the sample config: treat them as "no provider
+     * configured" instead of hammering them once per round.
+     */
+    public static function isPlaceholder(string $baseUrl): bool
+    {
+        foreach (['yourdomain.com', 'example.com', 'example.org'] as $needle) {
+            if (stripos($baseUrl, $needle) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** False when no usable provider is configured (local draws only). */
+    public function enabled(): bool
+    {
+        return $this->enabled;
     }
 
     public function endpoint(GameDefinition $game): string
@@ -80,15 +113,28 @@ class DrawFetcher
      */
     public function fetchRows(GameDefinition $game): ?array
     {
+        if (!$this->enabled) {
+            return null;
+        }
+
         $url = $this->endpoint($game);
         if (array_key_exists($url, $this->memo)) {
             return $this->memo[$url];
         }
 
-        $payload = $this->http->fetchArray($url);
-        if ($payload === null) {
+        // Back off after a failure so an unreachable provider cannot flood the
+        // log (or stall the worker) once per round, per game.
+        $now = Clock::now();
+        if (($this->cooldownUntil[$url] ?? 0) > $now) {
             return $this->memo[$url] = null;
         }
+
+        $payload = $this->http->fetchArray($url);
+        if ($payload === null) {
+            $this->cooldownUntil[$url] = $now + $this->cooldown;
+            return $this->memo[$url] = null;
+        }
+        unset($this->cooldownUntil[$url]);
 
         $rows    = $this->extractRows($payload);
         $indexed = [];
@@ -125,9 +171,15 @@ class DrawFetcher
         return array_is_list($payload) ? $payload : [];
     }
 
-    /** Testing/ops hook: drop the in-request cache. */
+    /** Drop the per-request response cache (the back-off window survives). */
     public function flush(): void
     {
         $this->memo = [];
+    }
+
+    /** Forget any provider back-off, e.g. after fixing the configuration. */
+    public function resetBackoff(): void
+    {
+        $this->cooldownUntil = [];
     }
 }

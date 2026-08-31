@@ -123,7 +123,9 @@ class App
             $this->http(),
             $this->rules(),
             (string) $this->config['draw_base_url'],
-            (string) $this->config['draw_url_template']
+            (string) $this->config['draw_url_template'],
+            (bool) ($this->config['draw_enabled'] ?? true),
+            (int) ($this->config['draw_failure_cooldown'] ?? 60)
         ));
     }
 

@@ -98,6 +98,12 @@ return [
     'draw_base_url'     => rtrim(Env::get('DRAW_BASE_URL', 'https://draw.yourdomain.com'), '/'),
     'draw_url_template' => Env::get('DRAW_URL_TEMPLATE', '{base}/{game}/{interval}.json'),
     'draw_timeout'      => (int) Env::get('DRAW_TIMEOUT', '5'),
+    // Set DRAW_ENABLED=false (or leave DRAW_BASE_URL as the sample host) to run
+    // purely on the local provably-fair generator.
+    'draw_enabled'      => Env::bool('DRAW_ENABLED', true),
+    // Seconds to skip a provider endpoint after it fails, so an outage cannot
+    // flood the log or slow the worker down.
+    'draw_failure_cooldown' => (int) Env::get('DRAW_FAILURE_COOLDOWN', '60'),
     // true  -> a round stays unresolved until the provider answers
     // false -> fall back to the local HMAC-SHA256 deterministic generator
     'force_remote_draw' => Env::bool('FORCE_REMOTE_DRAW', false),
