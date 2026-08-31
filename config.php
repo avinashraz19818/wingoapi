@@ -43,6 +43,8 @@ $drawProfiles = [
         'families'  => [],
         'headers'   => [],
         'prefixes'  => [],
+        // Day boundary used for the issue sequence (empty = app timezone).
+        'issue_tz'  => '',
     ],
 
     // https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json
@@ -51,21 +53,35 @@ $drawProfiles = [
         'templates' => [
             '{base}/{family}/{code}/GetHistoryIssuePage.json',
             '{base}/{family}/{code}/GetNoaverageEmerdList.json',
-            '{base}/{family}/{code}.json',
         ],
-        'families'  => ['D5' => '5D'],
+        'families'  => [],
+        // Their sequence restarts at 00:00 UTC (05:30 IST), not local midnight.
+        'issue_tz'  => 'UTC',
         'headers'   => [
             'Referer: https://ar-lottery01.com/',
             'Origin: https://ar-lottery01.com',
             'Accept-Language: en-US,en;q=0.9',
         ],
-        // Their 17-digit format is YYYYMMDD + <5 digit game prefix> + <4 digit seq>.
+        // Their 17-digit format is YYYYMMDD(UTC) + <5 digit game prefix> + <4 digit seq>.
+        // Confirmed live: WinGo 10001, K3 10101, 5D 10201, TrxWinGo 10301 (1M).
         'prefixes'  => [
-            'WinGo_30S' => '10003',
-            'WinGo_1M'  => '10001',
-            'WinGo_3M'  => '10002',
-            'WinGo_5M'  => '10004',
-            'WinGo_10M' => '10005',
+            'WinGo_1M'     => '10001',
+            'WinGo_3M'     => '10002',
+            'WinGo_30S'    => '10003',
+            'WinGo_5M'     => '10004',
+            'WinGo_10M'    => '10005',
+            'K3_1M'        => '10101',
+            'K3_3M'        => '10102',
+            'K3_5M'        => '10104',
+            'K3_10M'       => '10105',
+            'D5_1M'        => '10201',
+            'D5_3M'        => '10202',
+            'D5_5M'        => '10204',
+            'D5_10M'       => '10205',
+            'TrxWinGo_1M'  => '10301',
+            'TrxWinGo_3M'  => '10302',
+            'TrxWinGo_5M'  => '10304',
+            'TrxWinGo_10M' => '10305',
         ],
     ],
 ];
@@ -147,6 +163,8 @@ return [
     // Family name as it appears in the provider path (e.g. D5 -> 5D).
     'draw_family_names' => $profile['families'],
     'draw_headers'      => $profile['headers'],
+    // Timezone whose midnight starts the issue sequence (upstream parity).
+    'issue_timezone'    => Env::get('ISSUE_TIMEZONE', (string) ($profile['issue_tz'] ?? '')),
     'draw_verify_ssl'   => Env::bool('DRAW_VERIFY_SSL', true),
     // Adopt the provider's 5-digit game prefix so our issue numbers match theirs.
     'issue_prefixes'    => Env::bool('DRAW_ADOPT_ISSUE_PREFIXES', true) ? $profile['prefixes'] : [],

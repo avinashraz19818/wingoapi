@@ -64,7 +64,7 @@ class K3Rules extends AbstractFamilyRules
 
     public function fromProvider(array $row): ?array
     {
-        $raw = $this->pick($row, ['dice', 'openCode', 'result', 'number', 'code']);
+        $raw = $this->pick($row, ['dice', 'openCode', 'premium', 'result', 'number', 'code']);
         if ($raw === null) {
             return null;
         }

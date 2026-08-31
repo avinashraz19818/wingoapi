@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Lottery\Games;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use Lottery\Support\ApiException;
 use Lottery\Support\Clock;
 
@@ -13,13 +15,50 @@ use Lottery\Support\Clock;
  */
 class IssueScheduler
 {
+    /**
+     * Timezone whose midnight restarts the daily sequence. Empty = the app
+     * timezone (Asia/Kolkata). Upstream providers often number their rounds
+     * from 00:00 UTC, and matching that keeps our issue numbers identical.
+     */
+    private ?DateTimeZone $issueZone;
+
+    public function __construct(string $issueTimezone = '')
+    {
+        $this->issueZone = $issueTimezone === '' ? null : new DateTimeZone($issueTimezone);
+    }
+
     public function issueAt(GameDefinition $game, ?int $timestamp = null): Issue
     {
         $timestamp = $timestamp ?? Clock::now();
-        $dayStart  = strtotime(date('Y-m-d 00:00:00', $timestamp));
+        $dayStart  = $this->dayStart($timestamp);
         $index     = (int) floor(($timestamp - $dayStart) / $game->seconds);
 
         return $this->issueByIndex($game, $dayStart, $index);
+    }
+
+    /** Unix timestamp of the midnight that opens this issue day. */
+    private function dayStart(int $timestamp): int
+    {
+        if ($this->issueZone === null) {
+            return (int) strtotime(date('Y-m-d 00:00:00', $timestamp));
+        }
+
+        return (new DateTimeImmutable('@' . $timestamp))
+            ->setTimezone($this->issueZone)
+            ->setTime(0, 0, 0)
+            ->getTimestamp();
+    }
+
+    /** Date stamp (YYYYMMDD) used inside the issue number. */
+    private function dateStamp(int $timestamp): string
+    {
+        if ($this->issueZone === null) {
+            return date('Ymd', $timestamp);
+        }
+
+        return (new DateTimeImmutable('@' . $timestamp))
+            ->setTimezone($this->issueZone)
+            ->format('Ymd');
     }
 
     public function current(GameDefinition $game, ?int $timestamp = null): Issue
@@ -70,7 +109,10 @@ class IssueScheduler
             throw ApiException::validation('Issue number does not belong to ' . $game->code);
         }
 
-        $dayStart = strtotime($parts['date'] . ' 00:00:00');
+        $dayStart = $this->issueZone === null
+            ? strtotime($parts['date'] . ' 00:00:00')
+            : (new DateTimeImmutable($parts['date'] . ' 00:00:00', $this->issueZone))->getTimestamp();
+
         if ($dayStart === false) {
             throw ApiException::validation('Invalid issue date');
         }
@@ -85,7 +127,7 @@ class IssueScheduler
 
         return new Issue(
             $game->code,
-            IssueNumber::build($game, date('Ymd', $start), $index + 1),
+            IssueNumber::build($game, $this->dateStamp($start), $index + 1),
             $start,
             $end,
             $end - $game->lockSeconds,

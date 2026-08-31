@@ -264,3 +264,69 @@ TestRunner::ok('falls through to the next URL shape', $viaSecond !== null && $vi
 TestRunner::equals('both shapes were attempted', 2, count($fallback->seen));
 
 Clock::unfreeze();
+
+TestRunner::group('Feed — upstream parity (live-verified formats)');
+
+// Verified against the real provider on 2026-08-31 17:59 IST:
+//   WinGo_1M     20260831100010750
+//   K3_1M        20260831101010750
+//   D5_1M        20260831102010750   (digits arrive in `premium`)
+//   TrxWinGo_1M  20260831103010750
+// Their sequence restarts at 00:00 UTC, i.e. 05:30 IST.
+$live = makeTestApp([
+    'issue_timezone' => 'UTC',
+    'issue_prefixes' => [
+        'WinGo_1M' => '10001', 'K3_1M' => '10101', 'D5_1M' => '10201', 'TrxWinGo_1M' => '10301',
+        'WinGo_3M' => '10002', 'WinGo_30S' => '10003',
+    ],
+]);
+$reg2 = $live->registry();
+$sch  = $live->scheduler();
+
+Clock::freeze(strtotime('2026-08-31 17:59:30'));   // 12:29:30 UTC
+
+TestRunner::equals('WinGo_1M matches the live issue number',   '20260831100010750', $sch->current($reg2->get('WinGo_1M'))->issueNumber);
+TestRunner::equals('K3_1M matches the live issue number',      '20260831101010750', $sch->current($reg2->get('K3_1M'))->issueNumber);
+TestRunner::equals('D5_1M matches the live issue number',      '20260831102010750', $sch->current($reg2->get('D5_1M'))->issueNumber);
+TestRunner::equals('TrxWinGo_1M matches the live issue number','20260831103010750', $sch->current($reg2->get('TrxWinGo_1M'))->issueNumber);
+
+// First round of the UTC day = 05:30 IST
+Clock::freeze(strtotime('2026-08-31 05:30:30'));
+TestRunner::equals('UTC day opens at 05:30 IST', '20260831100010001', $sch->current($reg2->get('WinGo_1M'))->issueNumber);
+Clock::freeze(strtotime('2026-08-31 05:29:30'));
+TestRunner::equals('just before 05:30 IST is still the previous UTC day', '20260830100011440',
+    $sch->current($reg2->get('WinGo_1M'))->issueNumber);
+
+// Round boundaries stay correct across the shifted day
+Clock::freeze(strtotime('2026-08-31 17:59:30'));
+$liveIssue = $sch->current($reg2->get('WinGo_1M'));
+TestRunner::equals('round start', strtotime('2026-08-31 17:59:00'), $liveIssue->startTs);
+TestRunner::equals('round end', strtotime('2026-08-31 18:00:00'), $liveIssue->endTs);
+TestRunner::ok('issue rebuilds from its number',
+    $sch->fromIssueNumber($reg2->get('WinGo_1M'), '20260831100010750')->startTs === $liveIssue->startTs);
+
+// IST numbering is unaffected when no issue timezone is configured
+$istApp = makeTestApp();
+Clock::freeze(strtotime('2026-08-31 17:59:30'));
+TestRunner::equals('default profile still numbers by IST midnight', '20260831100011080',
+    $istApp->scheduler()->current($istApp->registry()->get('WinGo_1M'))->issueNumber);
+
+TestRunner::group('Feed — upstream row shapes');
+
+$d5Rules = new \Lottery\Games\Families\D5Rules();
+$d5Row   = $d5Rules->fromProvider(['issueNumber' => '20260831102010750', 'number' => '', 'color' => '', 'premium' => '92046', 'sum' => 21]);
+TestRunner::ok('D5 digits read from premium', $d5Row !== null && $d5Row['code'] === '92046');
+TestRunner::equals('D5 sum recomputed', 21, $d5Row['sum']);
+TestRunner::equals('D5 position A', 9, $d5Row['positions']['a']['digit']);
+TestRunner::equals('D5 position E', 6, $d5Row['positions']['e']['digit']);
+
+$k3Rules = new \Lottery\Games\Families\K3Rules();
+TestRunner::equals('K3 reads comma dice', [1, 3, 5], $k3Rules->fromProvider(['number' => '1,3,5'])['dice']);
+TestRunner::equals('K3 reads packed dice', [2, 4, 6], $k3Rules->fromProvider(['premium' => '246'])['dice']);
+TestRunner::equals('K3 reads an openCode', [1, 1, 6], $k3Rules->fromProvider(['openCode' => '1,1,6'])['dice']);
+
+$wgRules = new \Lottery\Games\Families\WinGoRules();
+TestRunner::equals('WinGo falls back to premium', 4, $wgRules->fromProvider(['number' => '', 'premium' => '4'])['number']);
+TestRunner::ok('WinGo ignores an unusable row', $wgRules->fromProvider(['number' => '', 'premium' => '']) === null);
+
+Clock::unfreeze();

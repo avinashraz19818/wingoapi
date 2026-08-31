@@ -45,7 +45,7 @@ class WinGoRules extends AbstractFamilyRules
 
     public function fromProvider(array $row): ?array
     {
-        $number = $this->pick($row, ['number', 'result', 'openCode', 'code', 'digit']);
+        $number = $this->pick($row, ['number', 'result', 'openCode', 'code', 'digit', 'premium']);
         if ($number === null || !preg_match('/^[0-9]$/', trim($number))) {
             return null;
         }

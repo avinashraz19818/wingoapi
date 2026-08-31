@@ -40,7 +40,8 @@ class D5Rules extends AbstractFamilyRules
 
     public function fromProvider(array $row): ?array
     {
-        $raw = $this->pick($row, ['digits', 'openCode', 'result', 'number', 'code']);
+        // Upstream sends the five digits in `premium` and leaves `number` empty.
+        $raw = $this->pick($row, ['digits', 'openCode', 'premium', 'result', 'number', 'code']);
         if ($raw === null) {
             return null;
         }

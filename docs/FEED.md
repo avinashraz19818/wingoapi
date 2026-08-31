@@ -41,10 +41,23 @@ DRAW_ADOPT_ISSUE_PREFIXES=true
 | URL | `{base}/{family}/{code}/GetHistoryIssuePage.json` (falls back to `GetNoaverageEmerdList.json`, then `{code}.json`) |
 | Headers | browser `User-Agent`, `Referer: https://ar-lottery01.com/`, gzip |
 | Family naming | `D5` → `5D` in the path |
-| Issue prefixes | WinGo 30S `10003` · 1M `10001` · 3M `10002` · 5M `10004` · 10M `10005` |
+| Issue prefixes | WinGo `1000x` · K3 `1010x` · 5D `1020x` · TrxWinGo `1030x` (interval: 1M `1`, 3M `2`, 30S `3`, 5M `4`, 10M `5`) |
+| Issue day | **00:00 UTC** (= 05:30 IST) — their sequence restarts there, so `ISSUE_TIMEZONE=UTC` is part of the profile |
+| Digits | 5D sends the five digits in `premium` with an empty `number` — handled |
 
-Because prefixes are adopted, **our 17-digit issue numbers are identical to the
-upstream's**, so players comparing two sites see the same round IDs.
+Because both the prefixes **and the day boundary** are adopted, our 17-digit
+issue numbers are identical to the upstream's — verified live:
+
+```
+WinGo_1M     20260831100010750
+K3_1M        20260831101010750
+5D_1M        20260831102010750
+TrxWinGo_1M  20260831103010750     (2026-08-31 17:59 IST = 12:29 UTC)
+```
+
+> Switching `ISSUE_TIMEZONE` renumbers future rounds. Rows drawn before the
+> switch keep their old numbers; clear `lot_results` first if you want a clean
+> history (only safe when no bets reference those rounds).
 
 `generic` (default) uses `{base}/{game}/{interval}.json` and our own prefixes.
 

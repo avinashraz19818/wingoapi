@@ -110,7 +110,9 @@ class App
 
     public function scheduler(): IssueScheduler
     {
-        return $this->singleton(IssueScheduler::class, fn() => new IssueScheduler());
+        return $this->singleton(IssueScheduler::class, fn() => new IssueScheduler(
+            (string) ($this->config['issue_timezone'] ?? '')
+        ));
     }
 
     public function http(): Http
