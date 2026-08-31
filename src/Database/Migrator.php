@@ -405,6 +405,35 @@ class Migrator
             'CREATE INDEX idx_audit_created ON ' . Tables::AUDIT . ' (id)',
         ];
 
+        /* ------------------------- v4: result feed domain whitelist (SaaS) */
+        $m[4] = [
+            'CREATE TABLE IF NOT EXISTS ' . Tables::DOMAINS . ' (
+                id {PK},
+                domain VARCHAR(191) NOT NULL UNIQUE,
+                label VARCHAR(64) NULL,
+                api_key VARCHAR(64) NOT NULL UNIQUE,
+                status {TINYINT} NOT NULL DEFAULT 1,
+                games {TEXT} NULL,
+                rate_limit {INT} NOT NULL DEFAULT 0,
+                requests_total {BIGINT} NOT NULL DEFAULT 0,
+                blocked_total {BIGINT} NOT NULL DEFAULT 0,
+                note VARCHAR(191) NULL,
+                expires_at {DATETIME} NULL,
+                last_seen_at {DATETIME} NULL,
+                created_at {DATETIME} NOT NULL DEFAULT {NOW}
+            ){ENGINE}',
+            'CREATE INDEX idx_domain_status ON ' . Tables::DOMAINS . ' (status)',
+
+            'CREATE TABLE IF NOT EXISTS ' . Tables::DOMAIN_USAGE . ' (
+                id {PK},
+                domain_id {BIGINT} NOT NULL,
+                day VARCHAR(10) NOT NULL,
+                requests {BIGINT} NOT NULL DEFAULT 0,
+                blocked {BIGINT} NOT NULL DEFAULT 0,
+                CONSTRAINT uq_domain_day UNIQUE (domain_id, day)
+            ){ENGINE}',
+        ];
+
         return $m;
     }
 

@@ -27,6 +27,9 @@ Every response uses one envelope: `{data, code, msg, msgCode, serviceTime}`.
 | **Admin overrides** | Per-game/per-issue forced results, plus the legacy one-shot "next round" mode. Consumed and cleared automatically. |
 | **Copy trading** | Curated plans (BigSmall, Color, K3 Big, 5D A-Big, TRX Green …); subscribers get one auto-bet per round with round budgets and duplicate protection. |
 | **Trends** | Missing count, open count, max continuous and current streak per option per position over the last 100 rounds. |
+| **Result feed (SaaS)** | Mirror an upstream provider (or draw locally) and republish results under **your own domain** in provider-compatible URLs. Customers never see the upstream. |
+| **Domain whitelist** | Only domains you whitelist can read the feed — enforced by Origin/Referer *and* per-customer API keys, with per-game plans, expiry dates, rate limits and usage counters. |
+| **Results board** | Public page at `/results` showing every game section with live countdowns and the latest draws. |
 | **Admin panel** | Web console at `/admin`: dashboard, live rounds with per-outcome risk exposure, one-click result overrides, users & wallets, immutable ledger, copy-trade plans, VIP, audit log. |
 | **Security** | CORS allowlist, 120 req/min rate limiting, hardened headers/HSTS, prepared statements everywhere, strict input validation. |
 | **Schema** | Auto-created on first request; versioned migrations in `src/Database/Migrator.php`, MySQL + SQLite dialects. |
@@ -68,11 +71,12 @@ php cron/worker.php --loop      # daemon (systemd)
 php tests/run.php
 ```
 
-423 assertions covering issue numbering, all five rule engines, the HMAC draw
+498 assertions covering issue numbering, all five rule engines, the HMAC draw
 generator, provider parsing, overrides, wallet/ledger invariants, stake maths and
 limits, idempotency, settlement payouts and tax, VIP levels and backfill, copy
 trading, trend statistics, JWT/signature security, the full API surface and the
-admin panel (session auth, risk simulation, wallet adjustments, plan CRUD, audit).
+admin panel (session auth, risk simulation, wallet adjustments, plan CRUD, audit),
+the result feed and every domain-whitelist rule.
 
 ## Layout
 
@@ -80,7 +84,8 @@ admin panel (session auth, risk simulation, wallet adjustments, plan CRUD, audit
 index.php               router / front controller
 api/Lottery.php         player API entrypoint (all actions)
 api/Admin.php           admin panel API entrypoint
-panel/                  admin web console (static SPA, no build step)
+api/Feed.php            public result feed (whitelisted domains only)
+panel/                  admin console + public results board (static, no build step)
 bootstrap.php           autoloader + runtime guards
 config.php              configuration (env-driven)
 schema.sql              generated MySQL reference DDL
@@ -106,6 +111,7 @@ docs/                   API.md, DEPLOY.md
 
 - [`docs/API.md`](docs/API.md) — every endpoint, bet type, odds table and error code
 - [`docs/ADMIN.md`](docs/ADMIN.md) — the admin panel: sections, admin API, hardening
+- [`docs/FEED.md`](docs/FEED.md) — the result feed, upstream mirroring and the domain whitelist
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — VPS setup, TLS, worker, ops and security checklist
 
 ## Configuration

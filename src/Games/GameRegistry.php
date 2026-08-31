@@ -51,6 +51,9 @@ class GameRegistry
     {
         $this->intervals = $config['intervals'] ?? [];
         $lockMap         = $config['betting']['lock_seconds'] ?? [];
+        // Optional per-game 5-digit issue prefix (familyCode + intervalCode).
+        // Used to line our issue numbers up exactly with an upstream provider.
+        $prefixes        = $config['issue_prefixes'] ?? [];
 
         foreach ($config['games'] ?? [] as $entry) {
             $family   = (string) ($entry['lottery'] ?? '');
@@ -63,12 +66,21 @@ class GameRegistry
             $meta = $this->intervals[$interval];
             $code = $family . '_' . $interval;
 
+            $familyCode   = self::FAMILY_CODES[$family];
+            $intervalCode = (string) $meta['issue_code'];
+
+            $prefix = (string) ($prefixes[$code] ?? '');
+            if (preg_match('/^\d{5}$/', $prefix)) {
+                $familyCode   = substr($prefix, 0, 3);
+                $intervalCode = substr($prefix, 3, 2);
+            }
+
             $this->games[strtolower($code)] = new GameDefinition(
                 $code,
                 $family,
-                self::FAMILY_CODES[$family],
+                $familyCode,
                 $interval,
-                (string) $meta['issue_code'],
+                $intervalCode,
                 (int) $meta['seconds'],
                 (int) ($lockMap[$interval] ?? 5),
                 (int) ($entry['sort'] ?? 0),

@@ -743,6 +743,122 @@ class AdminService
     }
 
     /* ===================================================================
+     |  Feed domains (SaaS whitelist)
+     * ================================================================ */
+
+    public function domains(string $search, int $pageNo, int $pageSize): array
+    {
+        $page = $this->app->domains()->paginate($search, $pageNo, $pageSize);
+
+        $page['summary'] = [
+            'total'    => (int) ($this->db->fetchValue('SELECT COUNT(*) FROM ' . Tables::DOMAINS) ?? 0),
+            'active'   => (int) ($this->db->fetchValue('SELECT COUNT(*) FROM ' . Tables::DOMAINS . ' WHERE status = 1') ?? 0),
+            'requests' => (int) ($this->db->fetchValue('SELECT COALESCE(SUM(requests_total),0) FROM ' . Tables::DOMAINS) ?? 0),
+            'blocked'  => (int) ($this->db->fetchValue('SELECT COALESCE(SUM(blocked_total),0) FROM ' . Tables::DOMAINS) ?? 0),
+        ];
+
+        return $page;
+    }
+
+    public function saveDomain(array $input, string $actor): array
+    {
+        $service = $this->app->domains();
+        $id      = (int) ($input['id'] ?? 0);
+
+        $games = $input['games'] ?? '';
+        if (is_string($games)) {
+            $games = array_values(array_filter(array_map('trim', explode(',', $games))));
+        }
+        foreach ((array) $games as $gameCode) {
+            $this->app->registry()->get((string) $gameCode);   // validates
+        }
+
+        if ($id > 0) {
+            $row = $service->update($id, $input + ['games' => $games]);
+            $this->audit($actor, 'domain.update', $row['domain'], ['id' => $id]);
+            return $row;
+        }
+
+        $row = $service->create(
+            (string) ($input['domain'] ?? ''),
+            (string) ($input['label'] ?? ''),
+            (array) $games,
+            (string) ($input['note'] ?? ''),
+            ($input['expiresAt'] ?? '') !== '' ? (string) $input['expiresAt'] : null
+        );
+        $this->audit($actor, 'domain.create', $row['domain'], ['games' => $row['games']]);
+
+        return $row;
+    }
+
+    public function setDomainStatus(int $id, int $status, string $actor): array
+    {
+        $row = $this->app->domains()->setStatus($id, $status);
+        $this->audit($actor, 'domain.status', $row['domain'] ?? (string) $id, ['status' => $status]);
+
+        return $row;
+    }
+
+    public function rotateDomainKey(int $id, string $actor): array
+    {
+        $row = $this->app->domains()->rotateKey($id);
+        $this->audit($actor, 'domain.rotate', $row['domain'] ?? (string) $id, []);
+
+        return $row;
+    }
+
+    public function deleteDomain(int $id, string $actor): array
+    {
+        $row     = $this->app->domains()->find($id);
+        $deleted = $this->app->domains()->delete($id);
+        if ($deleted) {
+            $this->audit($actor, 'domain.delete', (string) ($row['domain'] ?? $id), []);
+        }
+
+        return ['deleted' => $deleted];
+    }
+
+    public function domainUsage(int $id, int $days = 14): array
+    {
+        return [
+            'domain' => $this->app->domains()->present($this->app->domains()->find($id) ?? []),
+            'usage'  => $this->app->domains()->usage($id, $days),
+        ];
+    }
+
+    /** Everything an operator needs to hand the feed to a customer. */
+    public function feedInfo(string $baseUrl): array
+    {
+        $games = [];
+        foreach ($this->app->registry()->all() as $game) {
+            $games[] = [
+                'gameCode'    => $game->code,
+                'lottery'     => $game->family,
+                'interval'    => $game->intervalKey,
+                'issuePrefix' => $game->familyCode . $game->intervalCode,
+                'history'     => $baseUrl . '/' . $game->family . '/' . $game->code . '/GetHistoryIssuePage.json',
+                'issue'       => $baseUrl . '/' . $game->family . '/' . $game->code . '/GetGameIssue.json',
+            ];
+        }
+
+        $fetcher = $this->app->fetcher();
+
+        return [
+            'baseUrl'  => $baseUrl,
+            'board'    => $baseUrl . '/results',
+            'gameList' => $baseUrl . '/api/Feed?action=GameList',
+            'games'    => $games,
+            'upstream' => [
+                'profile'  => $this->app->config('draw_profile'),
+                'enabled'  => $fetcher->enabled(),
+                'baseUrl'  => $this->app->config('draw_base_url'),
+                'sample'   => $fetcher->endpoint($this->app->registry()->all()[0]),
+            ],
+            'rateLimit' => (int) $this->app->config('feed.rate_limit'),
+        ];
+    }
+
+    /* ===================================================================
      |  Audit trail
      * ================================================================ */
 

@@ -26,6 +26,8 @@ final class Tables
     public const FOLLOW_ORDERS = 'lot_follow_orders';
     public const SETTLEMENTS   = 'lot_settlements';
     public const AUDIT         = 'lot_admin_audit';
+    public const DOMAINS       = 'lot_domains';
+    public const DOMAIN_USAGE  = 'lot_domain_usage';
 
     /** @return array<int,string> */
     public static function all(): array
@@ -35,6 +37,7 @@ final class Tables
             self::ISSUES, self::RESULTS, self::BETS, self::IDEMPOTENCY, self::OVERRIDES,
             self::VIP, self::VIP_LOG, self::FOLLOW_PLANS, self::FOLLOW_SUBS,
             self::FOLLOW_ORDERS, self::SETTLEMENTS, self::AUDIT,
+            self::DOMAINS, self::DOMAIN_USAGE,
         ];
     }
 }

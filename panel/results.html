@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Lottery Results</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+<style>
+:root{
+  --bg:#0b0f16;--card:#151b26;--card2:#1b2330;--line:#26303f;--text:#e8eef7;--muted:#8998ae;
+  --accent:#4f8cff;--green:#22b573;--red:#e04f4f;--violet:#9b6bff;--amber:#f0b429;--radius:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1000px 500px at 50% -20%,#182238 0,transparent 60%),var(--bg);
+  color:var(--text);font:14px/1.55 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:9;
+  background:rgba(11,15,22,.92);backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px var(--accent)}
+.muted{color:var(--muted)}.small{font-size:12px}
+main{padding:18px 20px 60px;max-width:1400px;margin:0 auto}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tabs button{background:var(--card);border:1px solid var(--line);color:var(--muted);
+  padding:8px 14px;border-radius:999px;cursor:pointer;font-size:13px}
+.tabs button.active{background:rgba(79,140,255,.16);border-color:#33507f;color:#cfe0ff}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(79,140,255,.08),transparent)}
+.card-top h2{margin:0;font-size:15px}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:19px;letter-spacing:1px}
+.timer.warn{color:var(--amber)}.timer.closed{color:var(--red)}
+.issue{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.latest{display:flex;align-items:center;gap:14px;padding:16px}
+.latest .meta{display:flex;flex-direction:column;gap:3px}
+.ball{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;
+  font-weight:800;font-size:19px;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.ball.sm{width:26px;height:26px;font-size:12.5px;box-shadow:none}
+.red{background:#e04f4f}.green{background:#22b573}.violet{background:linear-gradient(135deg,#9b6bff,#6b46d6)}
+.mix-red{background:linear-gradient(135deg,#e04f4f 50%,#9b6bff 50%)}
+.mix-green{background:linear-gradient(135deg,#22b573 50%,#9b6bff 50%)}
+.plain{background:var(--card2);color:var(--text);border:1px solid var(--line)}
+.balls{display:inline-flex;gap:5px;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;
+  background:var(--card2);border:1px solid var(--line);color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 16px;text-align:left;border-top:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+tbody tr:hover{background:var(--card2)}
+.loading,.empty{padding:26px;text-align:center;color:var(--muted)}
+footer{padding:18px 20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;text-align:center}
+.err{margin:18px 0;padding:14px 16px;border-radius:12px;border:1px solid #5a2b2b;background:#2a1717;color:#ffb4b4}
+@media(max-width:520px){.grid{grid-template-columns:1fr}th,td{padding:7px 12px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="dot"></span> <span id="brand">Live Lottery Results</span></div>
+  <div class="small muted">
+    <span id="clock">—</span> IST · <span id="status">connecting…</span>
+  </div>
+</header>
+
+<main>
+  <div class="tabs" id="tabs"></div>
+  <div id="board" class="grid"><div class="loading">Loading games…</div></div>
+</main>
+
+<footer>Results refresh automatically · powered by your own feed</footer>
+
+<script>
+(() => {
+'use strict';
+const FEED = '/api/Feed';
+const state = { games: [], family: 'all', results: {}, busy: {} };
+
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = (n) => String(n).padStart(2, '0');
+const mmss = (s) => pad(Math.floor(Math.max(0, s) / 60)) + ':' + pad(Math.max(0, s) % 60);
+
+async function feed(action, params = {}) {
+  const qs = new URLSearchParams({ action, ...params }).toString();
+  const res = await fetch(`${FEED}?${qs}`, { headers: { Accept: 'application/json' } });
+  const body = await res.json();
+  if (body.code !== 0) throw new Error(body.msg || 'Request failed');
+  return body.data;
+}
+
+function ballFor(row) {
+  if (row.gameCode.startsWith('WinGo') || row.gameCode.startsWith('TrxWinGo')) {
+    const c = String(row.colour || '');
+    let cls = 'plain';
+    if (c.includes('violet') && c.includes('red')) cls = 'mix-red';
+    else if (c.includes('violet') && c.includes('green')) cls = 'mix-green';
+    else if (c.includes('red')) cls = 'red';
+    else if (c.includes('green')) cls = 'green';
+    return `<span class="ball ${cls}">${row.number}</span>`;
+  }
+  if (row.gameCode.startsWith('K3')) {
+    return `<span class="balls">${(row.dice || []).map((d) => `<span class="ball sm plain">${d}</span>`).join('')}</span>`;
+  }
+  if (row.gameCode.startsWith('D5')) {
+    return `<span class="balls">${String(row.openCode || '').split('').map((d) => `<span class="ball sm plain">${d}</span>`).join('')}</span>`;
+  }
+  if (row.gameCode.startsWith('MotoRace')) {
+    return `<span class="balls">${(row.podium || []).map((d, i) => `<span class="ball sm ${i === 0 ? 'green' : 'plain'}">${d}</span>`).join('')}</span>`;
+  }
+  return '<span class="muted">—</span>';
+}
+
+function summaryFor(row) {
+  if (row.gameCode.startsWith('K3')) return `sum ${row.sum} · ${esc(row.size)} · ${esc(row.parity)}`;
+  if (row.gameCode.startsWith('D5')) return `sum ${row.sum} · ${esc(row.size)}`;
+  if (row.gameCode.startsWith('MotoRace')) return `champion ${row.champion} · ${esc(row.size)}`;
+  return `${esc(row.colour)} · ${esc(row.size)} · ${esc(row.parity)}`;
+}
+
+function card(game) {
+  const rows = state.results[game.gameCode] || [];
+  const latest = rows[0];
+  return `
+    <section class="card" data-game="${esc(game.gameCode)}">
+      <div class="card-top">
+        <div>
+          <h2>${esc(game.name || game.gameCode)}</h2>
+          <div class="issue" data-issue>${esc(game.currentIssue)}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="timer" data-timer data-remaining="${game.remaining}">${mmss(game.remaining)}</div>
+          <div class="small muted">next draw</div>
+        </div>
+      </div>
+
+      <div class="latest">
+        ${latest ? ballFor(latest) : '<span class="ball plain">?</span>'}
+        <div class="meta">
+          <span class="small muted">${latest ? esc(latest.issueNumber) : 'waiting for the first draw'}</span>
+          <span>${latest ? summaryFor(latest) : ''}</span>
+          ${latest ? `<span class="tag">${esc(latest.source)}</span>` : ''}
+        </div>
+      </div>
+
+      ${rows.length ? `<table>
+        <thead><tr><th>Issue</th><th>Result</th><th>Detail</th></tr></thead>
+        <tbody>${rows.slice(0, 10).map((r) => `
+          <tr><td class="muted">${esc(String(r.issueNumber).slice(-6))}</td>
+              <td>${ballFor(r)}</td>
+              <td class="muted">${summaryFor(r)}</td></tr>`).join('')}</tbody>
+      </table>` : '<div class="empty">No draws yet</div>'}
+    </section>`;
+}
+
+function render() {
+  const games = state.family === 'all' ? state.games : state.games.filter((g) => g.lottery === state.family);
+  $('#board').innerHTML = games.map(card).join('') || '<div class="empty">No games</div>';
+}
+
+function renderTabs() {
+  const families = ['all', ...new Set(state.games.map((g) => g.lottery))];
+  $('#tabs').innerHTML = families.map((f) =>
+    `<button data-family="${esc(f)}" class="${f === state.family ? 'active' : ''}">${f === 'all' ? 'All games' : esc(f)}</button>`
+  ).join('');
+  document.querySelectorAll('#tabs button').forEach((b) => b.onclick = () => {
+    state.family = b.dataset.family;
+    renderTabs();
+    render();
+  });
+}
+
+async function loadResults(gameCode) {
+  if (state.busy[gameCode]) return;
+  state.busy[gameCode] = true;
+  try {
+    const data = await feed('History', { gameCode, pageSize: 10 });
+    state.results[gameCode] = data.list;
+  } catch (e) {
+    /* keep the previous rows on a transient error */
+  }
+  state.busy[gameCode] = false;
+}
+
+async function boot() {
+  try {
+    const data = await feed('GameList');
+    state.games = data.list;
+    renderTabs();
+    render();
+    $('#status').textContent = 'live';
+    await Promise.all(state.games.map((g) => loadResults(g.gameCode)));
+    render();
+  } catch (e) {
+    $('#board').innerHTML = `<div class="err"><strong>Feed unavailable.</strong> ${esc(e.message)}
+      <div class="small muted" style="margin-top:6px">If you are embedding this board on another site, whitelist that
+      domain in the admin panel first.</div></div>`;
+    $('#status').textContent = 'blocked';
+  }
+}
+
+// Local countdown; refetch a game's results the moment its round ends.
+setInterval(() => {
+  document.querySelectorAll('[data-timer]').forEach(async (el) => {
+    let left = Number(el.dataset.remaining) - 1;
+    const gameCode = el.closest('[data-game]').dataset.game;
+    const game = state.games.find((g) => g.gameCode === gameCode);
+
+    if (left <= 0) {
+      el.dataset.remaining = game ? game.intervalSeconds : 60;
+      el.textContent = mmss(Number(el.dataset.remaining));
+      setTimeout(async () => {
+        try {
+          const issue = await feed('Issue', { gameCode });
+          if (game) { game.currentIssue = issue.issueNumber; game.remaining = issue.remaining; }
+          el.dataset.remaining = issue.remaining;
+          const issueEl = el.closest('[data-game]').querySelector('[data-issue]');
+          if (issueEl) issueEl.textContent = issue.issueNumber;
+          await loadResults(gameCode);
+          render();
+        } catch (e) { /* retry next tick */ }
+      }, 1500);
+      return;
+    }
+
+    el.dataset.remaining = left;
+    el.textContent = mmss(left);
+    el.className = 'timer' + (left <= 5 ? ' closed' : left <= 15 ? ' warn' : '');
+  });
+}, 1000);
+
+setInterval(() => {
+  $('#clock').textContent = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+}, 1000);
+
+boot();
+})();
+</script>
+</body>
+</html>

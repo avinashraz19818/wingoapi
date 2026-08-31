@@ -762,6 +762,177 @@ views.plans = async (state = {}) => {
   $$('[data-user]').forEach((b) => b.onclick = () => openUser(b.dataset.user));
 };
 
+
+/* ------------------------------------------------------ feed domains */
+views.domains = async (state = {}) => {
+  const filters = { search: state.search ?? '', pageNo: state.pageNo ?? 1, pageSize: 20 };
+  const data = await api('domains', filters);
+  const s = data.summary;
+
+  $('#view').innerHTML = `
+    <div class="grid k4">
+      ${statCard('Whitelisted domains', s.total, s.active + ' active')}
+      ${statCard('Feed requests', Number(s.requests).toLocaleString('en-IN'), 'all time')}
+      ${statCard('Blocked attempts', Number(s.blocked).toLocaleString('en-IN'), 'not whitelisted / disabled')}
+      ${statCard('Per-domain limit', '600/min', 'override per domain below')}
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Whitelist a customer domain</h3>
+        <span class="muted small">only these domains can read your result feed</span>
+      </div>
+      <div class="form-grid">
+        <label>Domain <input id="dm-domain" placeholder="client-site.com"></label>
+        <label>Label <input id="dm-label" placeholder="Client name"></label>
+        <label>Games <input id="dm-games" placeholder="blank = all games, or WinGo_1M,K3_1M"></label>
+        <label>Rate limit /min <input id="dm-rate" type="number" min="0" step="10" value="0" placeholder="0 = default"></label>
+        <label>Expires <input id="dm-expires" placeholder="YYYY-MM-DD HH:MM:SS (optional)"></label>
+        <label>Note <input id="dm-note" placeholder="plan / contact"></label>
+      </div>
+      <input type="hidden" id="dm-id" value="">
+      <div class="btn-row mt">
+        <button class="btn primary" id="dm-save">Save domain</button>
+        <button class="btn ghost" id="dm-clear">Clear form</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Domains</h3>
+        <div class="filters">
+          <div class="field"><input id="f-search" value="${esc(filters.search)}" placeholder="search domain"></div>
+          <button class="btn" id="f-go">Search</button>
+        </div>
+      </div>
+      ${table([
+        { label: 'Domain', render: (r) => `<strong>${esc(r.domain)}</strong><div class="muted small">${esc(r.label ?? '')}</div>` },
+        { label: 'API key', render: (r) => `<code class="small">${esc(r.apiKey.slice(0, 10))}…</code>
+            <button class="btn small ghost" data-copy="${esc(r.apiKey)}">copy</button>` },
+        { label: 'Games', render: (r) => r.games.length ? esc(r.games.join(', ')) : '<span class="muted small">all</span>' },
+        { label: 'Requests', num: true, render: (r) => Number(r.requests).toLocaleString('en-IN') },
+        { label: 'Blocked', num: true, render: (r) => Number(r.blocked).toLocaleString('en-IN') },
+        { label: 'Last seen', render: (r) => `<span class="muted small">${esc(r.lastSeenAt ?? 'never')}</span>` },
+        { label: 'Status', render: (r) => r.status === 1 ? '<span class="pill ok">allowed</span>' : '<span class="pill bad">blocked</span>' },
+        { label: '', render: (r) => `<div class="btn-row">
+            <button class="btn small" data-edit-domain='${esc(JSON.stringify(r))}'>Edit</button>
+            <button class="btn small" data-usage="${r.id}">Usage</button>
+            <button class="btn small ${r.status === 1 ? 'danger' : ''}" data-toggle-domain="${r.id}" data-status="${r.status === 1 ? 0 : 1}">${r.status === 1 ? 'Block' : 'Allow'}</button>
+            <button class="btn small" data-rotate="${r.id}">Rotate key</button>
+            <button class="btn small danger" data-del-domain="${r.id}">Delete</button>
+          </div>` },
+      ], data.list, 'No domains yet — add one above, otherwise nobody can read the feed')}
+      ${pager(data, (p) => views.domains({ ...filters, pageNo: p }))}
+    </div>`;
+
+  $('#f-go').onclick = () => views.domains({ search: $('#f-search').value.trim(), pageNo: 1 });
+  $('#dm-clear').onclick = () => views.domains(filters);
+  $('#dm-save').onclick = async () => {
+    try {
+      const r = await api('savedomain', {
+        id: $('#dm-id').value || 0,
+        domain: $('#dm-domain').value.trim(),
+        label: $('#dm-label').value.trim(),
+        games: $('#dm-games').value.trim(),
+        rateLimit: $('#dm-rate').value || 0,
+        expiresAt: $('#dm-expires').value.trim(),
+        note: $('#dm-note').value.trim(),
+      }, 'POST');
+      toast('Saved ' + r.domain);
+      modal('Feed access for ' + r.domain, `
+        <p class="muted small">Give the customer these details. Requests from any other domain are rejected.</p>
+        <div class="card"><h3>Base URL</h3><code>${esc(location.origin)}</code></div>
+        <div class="card mt"><h3>API key (server-to-server)</h3><code>${esc(r.apiKey)}</code></div>
+        <div class="card mt"><h3>Example</h3>
+          <textarea rows="3" readonly>${esc(location.origin)}/WinGo/WinGo_1M/GetHistoryIssuePage.json</textarea>
+          <textarea rows="3" readonly>curl -H "X-Api-Key: ${esc(r.apiKey)}" "${esc(location.origin)}/api/Feed?action=History&gameCode=WinGo_1M"</textarea>
+        </div>`);
+      views.domains(filters);
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  $$('[data-copy]').forEach((b) => b.onclick = () => {
+    navigator.clipboard?.writeText(b.dataset.copy);
+    toast('API key copied');
+  });
+  $$('[data-edit-domain]').forEach((b) => b.onclick = () => {
+    const d = JSON.parse(b.dataset.editDomain);
+    $('#dm-id').value = d.id; $('#dm-domain').value = d.domain; $('#dm-label').value = d.label ?? '';
+    $('#dm-games').value = d.games.join(','); $('#dm-rate').value = d.rateLimit;
+    $('#dm-expires').value = d.expiresAt ?? ''; $('#dm-note').value = d.note ?? '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  $$('[data-toggle-domain]').forEach((b) => b.onclick = async () => {
+    try { await api('setdomainstatus', { id: b.dataset.toggleDomain, status: b.dataset.status }, 'POST'); toast('Updated'); views.domains(filters); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+  $$('[data-rotate]').forEach((b) => b.onclick = async () => {
+    if (!confirm('Rotate the API key? The old key stops working immediately.')) return;
+    try { const r = await api('rotatedomainkey', { id: b.dataset.rotate }, 'POST'); toast('New key: ' + r.apiKey); views.domains(filters); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+  $$('[data-del-domain]').forEach((b) => b.onclick = async () => {
+    if (!confirm('Delete this domain? It will lose access immediately.')) return;
+    try { await api('deletedomain', { id: b.dataset.delDomain }, 'POST'); toast('Deleted'); views.domains(filters); }
+    catch (e) { toast(e.message, 'err'); }
+  });
+  $$('[data-usage]').forEach((b) => b.onclick = async () => {
+    modal('Usage', '<div class="loading">Loading…</div>');
+    try {
+      const d = await api('domainusage', { id: b.dataset.usage, days: 14 });
+      $('#modal-body').innerHTML = `
+        <p class="muted small">${esc(d.domain.domain)} · ${Number(d.domain.requests).toLocaleString('en-IN')} requests total</p>
+        ${table([
+          { label: 'Day', render: (r) => esc(r.day) },
+          { label: 'Requests', num: true, render: (r) => r.requests },
+          { label: 'Blocked', num: true, render: (r) => r.blocked },
+        ], d.usage, 'No traffic yet')}`;
+    } catch (e) { $('#modal-body').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  });
+};
+
+/* --------------------------------------------------------- feed info */
+views.feed = async () => {
+  const d = await api('feedinfo');
+
+  $('#view').innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3>Your feed</h3>
+        ${d.upstream.enabled
+          ? `<span class="pill ok">upstream: ${esc(d.upstream.profile)}</span>`
+          : '<span class="pill warn">upstream off — local generator</span>'}
+      </div>
+      <p class="muted small">Hand these URLs to customers. Only whitelisted domains (see the Domains tab) get data;
+      everyone else receives <code>403 DOMAIN_NOT_ALLOWED</code>.</p>
+      <div class="grid k2">
+        <div>
+          <h3 class="muted small">Base URL</h3><code>${esc(d.baseUrl)}</code>
+          <h3 class="muted small mt">Game list</h3><code>${esc(d.gameList)}</code>
+          <h3 class="muted small mt">Public board</h3><code>${esc(d.board)}</code>
+        </div>
+        <div>
+          <h3 class="muted small">Upstream source (never exposed to customers)</h3>
+          <code>${esc(d.upstream.baseUrl)}</code>
+          <div class="muted small mt">sample: ${esc(d.upstream.sample)}</div>
+          <div class="muted small">feed limit: ${d.rateLimit} req/min per domain</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Endpoints per game</h3>
+      ${table([
+        { label: 'Game', render: (r) => `<strong>${esc(r.gameCode)}</strong>` },
+        { label: 'Issue prefix', render: (r) => `<code>${esc(r.issuePrefix)}</code>` },
+        { label: 'History', render: (r) => `<code class="small">${esc(r.history)}</code>
+            <button class="btn small ghost" data-copy="${esc(r.history)}">copy</button>` },
+        { label: 'Current issue', render: (r) => `<code class="small">${esc(r.issue)}</code>` },
+      ], d.games)}
+    </div>`;
+
+  $$('[data-copy]').forEach((b) => b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copy); toast('URL copied'); });
+};
+
 /* ---------------------------------------------------------------- vip */
 views.vip = async () => {
   const d = await api('vip', { limit: 25 });

@@ -3,6 +3,8 @@
  * Single entrypoint / router.
  *
  *   /api/Lottery      -> the SaaS Lottery API (see docs/API.md)
+ *   /api/Feed         -> public result feed for whitelisted domains
+ *   /{Family}/{Game}/GetHistoryIssuePage.json -> provider-compatible feed
  *   /api/Admin        -> admin panel API (see docs/ADMIN.md)
  *   /admin            -> admin web panel (SPA)
  *   /health           -> liveness probe
@@ -16,6 +18,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 
 use Lottery\Api\AdminKernel;
+use Lottery\Api\FeedKernel;
 use Lottery\Api\Kernel;
 use Lottery\App;
 use Lottery\Support\Response;
@@ -80,13 +83,32 @@ if ($uri === '/health' || $uri === '/api/health') {
     exit;
 }
 
-/* ----------------------------------------------- provider-compatible paths
- | /WinGo/WinGo_1M/GetHistoryIssuePage.json style URLs used by some clients.
+/* ------------------------------------------------------------ result feed
+ | Provider-compatible URLs served to whitelisted customer domains:
+ |   /WinGo/WinGo_1M/GetHistoryIssuePage.json
+ |   /WinGo/WinGo_1M/GetNoaverageEmerdList.json
+ |   /WinGo/WinGo_1M/GetGameIssue.json
  */
-if (preg_match('#^/([A-Za-z0-9]+)/([A-Za-z0-9_]+)/GetHistoryIssuePage\.json$#i', $uri, $m)) {
-    $_GET['action']   = 'GetHistoryIssuePage';
-    $_GET['gameCode'] = $m[2];
-    (new Kernel($app))->handle();
+if (preg_match('#^/api/feed$#i', $uri)) {
+    (new FeedKernel($app))->handle();
+    exit;
+}
+
+if (preg_match('#^/([A-Za-z0-9]+)/([A-Za-z0-9_]+)/(GetHistoryIssuePage|GetNoaverageEmerdList|GetGameIssue|GetResult)\.json$#i', $uri, $m)) {
+    (new FeedKernel($app))->handle(['gameCode' => $m[2], 'action' => $m[3]]);
+    exit;
+}
+
+// Public results board (all game sections with live results).
+if (preg_match('#^/(results|board)$#i', $uri)) {
+    if (!$app->config('feed.board_enabled')) {
+        Security::applyHeaders((array) $app->config('security'));
+        Response::send(Response::error('Results board is disabled', Response::ERR_NOT_FOUND, 'NOT_FOUND'), 404);
+        exit;
+    }
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    readfile(__DIR__ . '/panel/results.html');
     exit;
 }
 

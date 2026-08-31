@@ -26,6 +26,7 @@ class AdminController
         'login', 'setoverride', 'canceloverride', 'settle', 'adjustwallet',
         'createuser', 'setuserstatus', 'saveplan', 'deleteplan', 'stopfollow',
         'backfillvip', 'runworkerpass',
+        'savedomain', 'deletedomain', 'rotatedomainkey', 'setdomainstatus',
     ];
 
     /** Actions callable without an admin session. */
@@ -307,6 +308,54 @@ class AdminController
         return $result + $this->app->vip()->status($userId);
     }
 
+    /* --------------------------------------------- feed domain whitelist */
+
+    public function domains(): array
+    {
+        return $this->admin->domains(
+            Validator::optionalString($this->input, 'search', '', 64),
+            Validator::int($this->input, 'pageNo', 1, 1, 10000),
+            Validator::int($this->input, 'pageSize', 20, 1, 100)
+        );
+    }
+
+    public function saveDomain(): array
+    {
+        return $this->admin->saveDomain($this->input, $this->actor);
+    }
+
+    public function setDomainStatus(): array
+    {
+        return $this->admin->setDomainStatus(
+            Validator::int($this->input, 'id', 0, 1, PHP_INT_MAX),
+            Validator::int($this->input, 'status', 1, 0, 1),
+            $this->actor
+        );
+    }
+
+    public function rotateDomainKey(): array
+    {
+        return $this->admin->rotateDomainKey(Validator::int($this->input, 'id', 0, 1, PHP_INT_MAX), $this->actor);
+    }
+
+    public function deleteDomain(): array
+    {
+        return $this->admin->deleteDomain(Validator::int($this->input, 'id', 0, 1, PHP_INT_MAX), $this->actor);
+    }
+
+    public function domainUsage(): array
+    {
+        return $this->admin->domainUsage(
+            Validator::int($this->input, 'id', 0, 1, PHP_INT_MAX),
+            Validator::int($this->input, 'days', 14, 1, 90)
+        );
+    }
+
+    public function feedInfo(): array
+    {
+        return $this->admin->feedInfo($this->baseUrl());
+    }
+
     /* ----------------------------------------------------------- audit */
 
     public function auditLog(): array
@@ -318,6 +367,14 @@ class AdminController
     }
 
     /* --------------------------------------------------------- helpers */
+
+    private function baseUrl(): string
+    {
+        $scheme = (!empty($_SERVER['HTTPS']) || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https' : 'http';
+        $host   = (string) ($_SERVER['HTTP_HOST'] ?? $this->app->config('app.domain'));
+
+        return $scheme . '://' . $host;
+    }
 
     private function game()
     {
@@ -335,6 +392,8 @@ class AdminController
             'bets', 'users', 'user', 'createuser', 'adjustwallet', 'setuserstatus',
             'ledger', 'plans', 'saveplan', 'deleteplan', 'follows', 'stopfollow',
             'vip', 'backfillvip', 'auditlog',
+            'domains', 'savedomain', 'setdomainstatus', 'rotatedomainkey',
+            'deletedomain', 'domainusage', 'feedinfo',
         ];
     }
 
@@ -368,6 +427,13 @@ class AdminController
             case 'vip':            return $this->vip();
             case 'backfillvip':    return $this->backfillVip();
             case 'auditlog':       return $this->auditLog();
+            case 'domains':          return $this->domains();
+            case 'savedomain':       return $this->saveDomain();
+            case 'setdomainstatus':  return $this->setDomainStatus();
+            case 'rotatedomainkey':  return $this->rotateDomainKey();
+            case 'deletedomain':     return $this->deleteDomain();
+            case 'domainusage':      return $this->domainUsage();
+            case 'feedinfo':         return $this->feedInfo();
         }
 
         throw ApiException::notFound("Unknown admin action: {$action}");

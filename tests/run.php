@@ -146,6 +146,7 @@ $files = [
     __DIR__ . '/AuthTest.php',
     __DIR__ . '/ApiTest.php',
     __DIR__ . '/AdminTest.php',
+    __DIR__ . '/FeedTest.php',
 ];
 
 foreach ($files as $file) {

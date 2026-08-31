@@ -13,11 +13,20 @@ class Http
 {
     private int $timeout;
     private string $userAgent;
+    /** @var array<int,string> headers sent with every request */
+    private array $defaultHeaders;
+    private bool $verifySsl;
 
-    public function __construct(int $timeout = 5, string $userAgent = 'LotteryAPI/4.0')
-    {
-        $this->timeout   = max(1, $timeout);
-        $this->userAgent = $userAgent;
+    public function __construct(
+        int $timeout = 5,
+        string $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        array $defaultHeaders = [],
+        bool $verifySsl = true
+    ) {
+        $this->timeout        = max(1, $timeout);
+        $this->userAgent      = $userAgent;
+        $this->defaultHeaders = $defaultHeaders;
+        $this->verifySsl      = $verifySsl;
     }
 
     /**
@@ -26,6 +35,7 @@ class Http
     public function getJson(string $url, array $headers = []): array
     {
         $started = microtime(true);
+        $headers = array_merge($this->defaultHeaders, $headers);
         $result  = function_exists('curl_init')
             ? $this->viaCurl($url, $headers)
             : $this->viaStream($url, $headers);
@@ -61,10 +71,11 @@ class Http
             CURLOPT_CONNECTTIMEOUT => min($this->timeout, 3),
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS      => 3,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_SSL_VERIFYPEER => $this->verifySsl,
+            CURLOPT_SSL_VERIFYHOST => $this->verifySsl ? 2 : 0,
             CURLOPT_USERAGENT      => $this->userAgent,
-            CURLOPT_HTTPHEADER     => array_merge(['Accept: application/json'], $headers),
+            CURLOPT_ENCODING       => 'gzip, deflate',
+            CURLOPT_HTTPHEADER     => array_merge(['Accept: application/json, text/plain, */*'], $headers),
         ]);
         $body   = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -91,7 +102,7 @@ class Http
                     $headers
                 )),
             ],
-            'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
+            'ssl' => ['verify_peer' => $this->verifySsl, 'verify_peer_name' => $this->verifySsl],
         ]);
 
         $body   = @file_get_contents($url, false, $context);

@@ -30,6 +30,50 @@ if (!defined('SQLITE_FILE'))define('SQLITE_FILE', Env::get('SQLITE_FILE', __DIR_
 if (!defined('PLATFORM_FEE_RATE')) define('PLATFORM_FEE_RATE', Env::float('PAYOUT_TAX_RATE', 0.02));
 
 /**
+ * Draw provider profiles.
+ *
+ * A profile bundles everything a provider needs: URL shapes, the family name it
+ * uses in the path, the HTTP headers it expects, and the 5-digit issue prefix
+ * per game so our issue numbers line up 1:1 with theirs.
+ */
+$drawProfiles = [
+    'generic' => [
+        'base'      => 'https://draw.yourdomain.com',
+        'templates' => ['{base}/{game}/{interval}.json'],
+        'families'  => [],
+        'headers'   => [],
+        'prefixes'  => [],
+    ],
+
+    // https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json
+    'ar-lottery01' => [
+        'base'      => 'https://draw.ar-lottery01.com',
+        'templates' => [
+            '{base}/{family}/{code}/GetHistoryIssuePage.json',
+            '{base}/{family}/{code}/GetNoaverageEmerdList.json',
+            '{base}/{family}/{code}.json',
+        ],
+        'families'  => ['D5' => '5D'],
+        'headers'   => [
+            'Referer: https://ar-lottery01.com/',
+            'Origin: https://ar-lottery01.com',
+            'Accept-Language: en-US,en;q=0.9',
+        ],
+        // Their 17-digit format is YYYYMMDD + <5 digit game prefix> + <4 digit seq>.
+        'prefixes'  => [
+            'WinGo_30S' => '10003',
+            'WinGo_1M'  => '10001',
+            'WinGo_3M'  => '10002',
+            'WinGo_5M'  => '10004',
+            'WinGo_10M' => '10005',
+        ],
+    ],
+];
+
+$profileName = Env::get('DRAW_PROFILE', 'generic');
+$profile     = $drawProfiles[$profileName] ?? $drawProfiles['generic'];
+
+/**
  * Interval catalogue.
  *   code    -> suffix used in the game code (WinGo_1M)
  *   seconds -> round length
@@ -95,8 +139,17 @@ return [
 
     /* ----------------------------------------------------------------- draw */
     // Provider endpoint template: {base}/{game}/{interval}.json
-    'draw_base_url'     => rtrim(Env::get('DRAW_BASE_URL', 'https://draw.yourdomain.com'), '/'),
-    'draw_url_template' => Env::get('DRAW_URL_TEMPLATE', '{base}/{game}/{interval}.json'),
+    'draw_profile'      => $profileName,
+    'draw_base_url'     => rtrim(Env::get('DRAW_BASE_URL', (string) $profile['base']), '/'),
+    'draw_url_template' => Env::get('DRAW_URL_TEMPLATE', (string) $profile['templates'][0]),
+    // Extra URL shapes tried (in order) until one returns usable rows.
+    'draw_url_templates'=> $profile['templates'],
+    // Family name as it appears in the provider path (e.g. D5 -> 5D).
+    'draw_family_names' => $profile['families'],
+    'draw_headers'      => $profile['headers'],
+    'draw_verify_ssl'   => Env::bool('DRAW_VERIFY_SSL', true),
+    // Adopt the provider's 5-digit game prefix so our issue numbers match theirs.
+    'issue_prefixes'    => Env::bool('DRAW_ADOPT_ISSUE_PREFIXES', true) ? $profile['prefixes'] : [],
     'draw_timeout'      => (int) Env::get('DRAW_TIMEOUT', '5'),
     // Set DRAW_ENABLED=false (or leave DRAW_BASE_URL as the sample host) to run
     // purely on the local provably-fair generator.
@@ -163,6 +216,15 @@ return [
             explode(',', Env::get('TRUSTED_PROXIES', ''))
         ))),
         'admin_token'       => Env::get('ADMIN_TOKEN', ''),
+    ],
+
+    /* ------------------------------------------- public result feed (SaaS) */
+    'feed' => [
+        // Requests/minute per whitelisted domain (per-domain override wins).
+        'rate_limit'   => (int) Env::get('FEED_RATE_LIMIT', '600'),
+        // Public results board at /results
+        'board_enabled'=> Env::bool('FEED_BOARD_ENABLED', true),
+        'brand'        => Env::get('FEED_BRAND', 'Lottery Results'),
     ],
 
     /* ------------------------------------------------------- admin panel */

@@ -24,6 +24,7 @@ use Lottery\Stats\TrendService;
 use Lottery\Support\Http;
 use Lottery\Support\Log;
 use Lottery\Support\RateLimiter;
+use Lottery\Tenant\DomainService;
 use Lottery\Vip\VipService;
 use Lottery\Wallet\WalletService;
 
@@ -114,7 +115,12 @@ class App
 
     public function http(): Http
     {
-        return $this->singleton(Http::class, fn() => new Http((int) $this->config['draw_timeout']));
+        return $this->singleton(Http::class, fn() => new Http(
+            (int) $this->config['draw_timeout'],
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            (array) ($this->config['draw_headers'] ?? []),
+            (bool) ($this->config['draw_verify_ssl'] ?? true)
+        ));
     }
 
     public function fetcher(): DrawFetcher
@@ -123,9 +129,10 @@ class App
             $this->http(),
             $this->rules(),
             (string) $this->config['draw_base_url'],
-            (string) $this->config['draw_url_template'],
+            (array) ($this->config['draw_url_templates'] ?? [$this->config['draw_url_template']]),
             (bool) ($this->config['draw_enabled'] ?? true),
-            (int) ($this->config['draw_failure_cooldown'] ?? 60)
+            (int) ($this->config['draw_failure_cooldown'] ?? 60),
+            (array) ($this->config['draw_family_names'] ?? [])
         ));
     }
 
@@ -228,6 +235,24 @@ class App
             $this->db(),
             $this->jwt(),
             $this->wallet()
+        ));
+    }
+
+    public function domains(): DomainService
+    {
+        return $this->singleton(DomainService::class, fn() => new DomainService(
+            $this->db(),
+            (string) $this->config('app.domain')
+        ));
+    }
+
+    /** Separate limiter bucket (and budget) for the public feed. */
+    public function feedRateLimiter(int $limit): RateLimiter
+    {
+        return $this->singleton('rate.feed.' . $limit, fn() => new RateLimiter(
+            rtrim((string) $this->config('security.rate_limit_store'), '/') . '/feed',
+            $limit,
+            60
         ));
     }
 
