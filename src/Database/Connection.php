@@ -63,11 +63,46 @@ class Connection
             PDO::ATTR_STRINGIFY_FETCHES  => false,
             PDO::ATTR_TIMEOUT            => (int) ($config['timeout'] ?? 5),
         ]);
-        $pdo->exec("SET SESSION sql_mode='STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION'");
-        $pdo->exec("SET SESSION transaction_isolation='READ-COMMITTED'");
-        $pdo->exec("SET time_zone='+05:30'");
+        // Session tuning is best-effort: MariaDB and MySQL 5.6 spell some of
+        // these variables differently, and a missing one must never take the
+        // whole API down.
+        $this->trySession($pdo, [
+            "SET SESSION sql_mode='STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION'",
+        ]);
+        $this->trySession($pdo, [
+            "SET SESSION transaction_isolation='READ-COMMITTED'",   // MySQL 5.7+
+            "SET SESSION tx_isolation='READ-COMMITTED'",            // MariaDB / MySQL 5.6
+            "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED",
+        ]);
+        $this->trySession($pdo, [
+            "SET time_zone='" . $this->utcOffset() . "'",
+        ]);
 
         return $pdo;
+    }
+
+    /** Execute the first statement of the list that the server accepts. */
+    private function trySession(PDO $pdo, array $statements): void
+    {
+        foreach ($statements as $sql) {
+            try {
+                $pdo->exec($sql);
+                return;
+            } catch (PDOException $e) {
+                continue;
+            }
+        }
+        Log::warning('server rejected all session settings', ['first' => $statements[0] ?? '']);
+    }
+
+    /** Current UTC offset of the configured timezone, e.g. "+05:30". */
+    private function utcOffset(): string
+    {
+        $offset = (int) (new \DateTime('now', new \DateTimeZone(date_default_timezone_get())))->format('Z');
+        $sign   = $offset < 0 ? '-' : '+';
+        $offset = abs($offset);
+
+        return sprintf('%s%02d:%02d', $sign, intdiv($offset, 3600), intdiv($offset % 3600, 60));
     }
 
     private function connectSqlite(string $file): PDO
@@ -97,6 +132,16 @@ class Connection
     public function driver(): string
     {
         return $this->driver;
+    }
+
+    /** Human readable server version, e.g. "10.11.6-MariaDB". */
+    public function serverVersion(): string
+    {
+        try {
+            return (string) $this->pdo->getAttribute(PDO::ATTR_SERVER_VERSION);
+        } catch (PDOException $e) {
+            return 'unknown';
+        }
     }
 
     public function isMysql(): bool

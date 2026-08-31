@@ -158,6 +158,7 @@ class AdminService
             'timezone'       => $this->app->config('app.timezone'),
             'serverTime'     => Clock::dateTime(),
             'driver'         => $this->db->driver(),
+            'serverVersion'  => $this->db->serverVersion(),
             'schemaVersion'  => $this->app->migrator()->currentVersion(),
             'latestSchema'   => $this->app->migrator()->latestVersion(),
             'games'          => count($this->app->registry()->all()),

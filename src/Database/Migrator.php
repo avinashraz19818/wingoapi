@@ -137,7 +137,9 @@ class Migrator
             '{TINYINT}'  => 'TINYINT',
             '{MONEY}'    => 'DECIMAL(18,2)',
             '{RATE}'     => 'DECIMAL(10,4)',
-            '{JSON}'     => 'JSON',
+            // LONGTEXT rather than JSON: MariaDB and MySQL 5.6 do not have a
+            // native JSON type, and nothing here queries inside the document.
+            '{JSON}'     => 'LONGTEXT',
             '{TEXT}'     => 'TEXT',
             '{DATETIME}' => 'DATETIME',
             '{NOW}'      => 'CURRENT_TIMESTAMP',

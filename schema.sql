@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS lot_results (
     game_code VARCHAR(32) NOT NULL,
     issue_number VARCHAR(17) NOT NULL,
     family VARCHAR(24) NOT NULL,
-    result_json JSON NOT NULL,
+    result_json LONGTEXT NOT NULL,
     primary_number INT NULL,
     color VARCHAR(24) NULL,
     sum_value INT NULL,
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS lot_idempotency (
     idem_key VARCHAR(64) NOT NULL UNIQUE,
     user_id BIGINT UNSIGNED NOT NULL,
     action VARCHAR(48) NOT NULL,
-    response_json JSON NOT NULL,
+    response_json LONGTEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
