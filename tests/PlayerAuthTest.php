@@ -206,5 +206,6 @@ $junk = $call2('Whoami', [], 'GET', ['HTTP_AUTHORIZATION' => 'Bearer null']);
 TestRunner::ok('whoami ignores a null token', $junk['data']['tokenReceived'] === false);
 
 $bad = $call2('Whoami', [], 'GET', ['HTTP_AUTHORIZATION' => 'Bearer aaa.bbb.ccc']);
-TestRunner::ok('whoami explains a rejected token', $bad['data']['valid'] === false
-    && str_contains($bad['data']['hint'], 'rejected'));
+TestRunner::ok('whoami rejects a bogus token', $bad['data']['valid'] === false);
+TestRunner::ok('whoami reports why the JWT failed', isset($bad['data']['jwtError']));
+TestRunner::ok('whoami suggests the next step', $bad['data']['hint'] !== '');

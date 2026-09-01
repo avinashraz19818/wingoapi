@@ -233,3 +233,59 @@ $transfer = $partners->transfer($introDomains->find($partnerSite['id']), '4242',
 TestRunner::equals('transfers reach the same player', '500.00', $transfer['balance']);
 
 Clock::unfreeze();
+
+TestRunner::group('Partner sites — Whoami understands partner tokens');
+
+$whoApp = makeTestApp();
+$whoKernel = new Kernel($whoApp);
+$whoDomain = $whoApp->domains()->create('dhaniwin.club9.eu.cc', 'Dhani', [], '');
+$whoApp->domains()->update($whoDomain['id'], [
+    'validateUrl'    => 'https://dhaniwin.club9.eu.cc/api/User/GetUserInfo',
+    'validateMethod' => 'POST',
+]);
+
+/** Answers in the exact shape the live site returned. */
+final class LiveShapeStub extends \Lottery\Support\Http
+{
+    public function __construct() { parent::__construct(5); }
+    public function postArray(string $url, array $body, array $headers = []): ?array
+    {
+        foreach ($headers as $h) {
+            if ($h === 'Authorization: Bearer local_6bb2051b34d06e9995ea0e5b2f8b140eaee7510') {
+                return ['data' => [
+                    'userId'   => 132257,
+                    'nickName' => 'MemberNNGKLPHA',
+                    'vipLevel' => 0,
+                    'walletBalance' => 0,
+                ]];
+            }
+        }
+        return ['data' => null, 'code' => 1];
+    }
+}
+
+$liveStub = new LiveShapeStub();
+$livePartners = new \Lottery\Tenant\PartnerService(
+    $whoApp->db(), $whoApp->domains(), $whoApp->jwt(), $whoApp->wallet(), $whoApp->vip(), $liveStub
+);
+
+$live = $livePartners->resolveIntrospectedToken('local_6bb2051b34d06e9995ea0e5b2f8b140eaee7510', 'dhaniwin.club9.eu.cc');
+TestRunner::ok('the real response shape resolves a player', $live !== null && $live['id'] > 0);
+TestRunner::equals('mapped to their user id', 'p' . $whoDomain['id'] . '_132257', $live['mobile']);
+
+$noUser = $livePartners->resolveIntrospectedToken('local_expired_one', 'dhaniwin.club9.eu.cc');
+TestRunner::ok('an unknown token stays unauthenticated', $noUser === null);
+
+// Whoami now explains what is missing instead of "Malformed token"
+$_SERVER['REQUEST_METHOD'] = 'GET';
+$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer local_something';
+unset($_SERVER['HTTP_ORIGIN']);
+$diag = (new \Lottery\Api\LotteryController($whoApp, ['action' => 'Whoami']))->whoami();
+TestRunner::ok('Whoami reports the token arrived', $diag['tokenReceived'] === true);
+TestRunner::ok('Whoami no longer says "Malformed token"', !str_contains($diag['hint'], 'Malformed'));
+TestRunner::ok('Whoami asks for an Origin header', str_contains($diag['hint'], 'Origin'));
+
+$_SERVER['HTTP_ORIGIN'] = 'https://not-whitelisted.com';
+$diag2 = (new \Lottery\Api\LotteryController($whoApp, ['action' => 'Whoami']))->whoami();
+TestRunner::ok('Whoami names an unlisted domain', str_contains($diag2['hint'], 'not whitelisted'));
+unset($_SERVER['HTTP_ORIGIN'], $_SERVER['HTTP_AUTHORIZATION']);

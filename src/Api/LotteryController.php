@@ -240,16 +240,50 @@ class LotteryController
             return $result;
         }
 
+        // Our own JWT?
         try {
-            $claims           = $this->app->jwt()->verify($token);
-            $result['valid']  = true;
-            $result['userId'] = (int) $claims['id'];
-            $result['mobile'] = (string) $claims['mobile'];
+            $claims              = $this->app->jwt()->verify($token);
+            $result['valid']     = true;
+            $result['tokenKind'] = 'platform-jwt';
+            $result['userId']    = (int) $claims['id'];
+            $result['mobile']    = (string) $claims['mobile'];
             $result['expiresAt'] = date('Y-m-d H:i:s', (int) $claims['exp']);
-            $result['hint']   = 'Token is valid — authenticated endpoints will work.';
+            $result['hint']      = 'Token is valid — authenticated endpoints will work.';
+
+            return $result;
         } catch (ApiException $e) {
-            $result['hint'] = 'Token rejected: ' . $e->getMessage();
+            $result['jwtError'] = $e->getMessage();
         }
+
+        // Not ours — run the full chain (partner JWT, then token introspection
+        // against the partner's own API) exactly like a real request would.
+        $user = $this->app->auth()->optionalUser($_SERVER, $this->input);
+        if ($user !== null) {
+            $result['valid']     = true;
+            $result['tokenKind'] = 'partner-token';
+            $result['userId']    = (int) $user['id'];
+            $result['mobile']    = (string) $user['mobile'];
+            $result['hint']      = 'Recognised through your site — authenticated endpoints will work.';
+
+            return $result;
+        }
+
+        $origin = \Lottery\Tenant\DomainService::hostOf(
+            (string) ($_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '')
+        );
+        $domain = $origin === '' ? null : $this->app->domains()->findByDomain($origin);
+
+        if ($origin === '') {
+            $result['hint'] = 'Not our token, and no Origin/Referer header was sent — '
+                . 'add one so we know which partner site to ask.';
+        } elseif ($domain === null) {
+            $result['hint'] = "Not our token, and {$origin} is not whitelisted (admin panel -> Domains).";
+        } elseif (empty($domain['validate_url'])) {
+            $result['hint'] = "Not our token. Set a 'token check URL' for {$origin} so we can ask your site who owns it.";
+        } else {
+            $result['hint'] = 'Your site did not recognise this token (' . $domain['validate_url'] . ').';
+        }
+        $result['origin'] = $origin ?: null;
 
         return $result;
     }
