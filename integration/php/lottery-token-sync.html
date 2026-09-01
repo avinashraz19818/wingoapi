@@ -1,0 +1,46 @@
+<!--
+  Keeps the lottery token in sync with the site's own login.
+
+  Stock front-ends keep two tokens: `ar_token` (the platform login) and
+  `ar_g_token` (the game/lottery session, empty until a SaaS login happens).
+  Because the engine accepts the platform token through the proxy, the two can
+  simply be mirrored — no rebuild of the compiled JS required.
+
+  Paste this just before </body> in index.php / index.html of the site.
+-->
+<script>
+(function () {
+  'use strict';
+
+  function wrap(token) {
+    return JSON.stringify({ value: token, expires: -1 });
+  }
+
+  function read(key) {
+    var raw = localStorage.getItem(key);
+    if (!raw) return '';
+    if (raw.charAt(0) === '{') {
+      try { return JSON.parse(raw).value || ''; } catch (e) { return ''; }
+    }
+    return raw;
+  }
+
+  function sync() {
+    try {
+      var platform = read('ar_token');
+      var game     = read('ar_g_token');
+
+      if (platform && game !== platform) {
+        localStorage.setItem('ar_g_token', wrap(platform));
+      }
+      if (!platform && game) {
+        localStorage.setItem('ar_g_token', wrap(null));
+      }
+    } catch (e) { /* private mode, ignore */ }
+  }
+
+  sync();
+  setInterval(sync, 2000);
+  window.addEventListener('storage', sync);
+})();
+</script>

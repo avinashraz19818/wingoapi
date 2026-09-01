@@ -373,3 +373,23 @@ TestRunner::ok('an unrestricted provider serves everything',
     $openFetcher->servesGame($supApp->registry()->get('MotoRace_1M')));
 
 Clock::unfreeze();
+
+TestRunner::group('Feed — issue schedule for stock front-ends');
+
+$schedApp = makeTestApp();
+$schedKernel = new FeedKernel($schedApp);
+
+Clock::freeze(strtotime('2026-09-01 07:59:57'));
+$sched = $schedKernel->dispatch('schedule', ['gameCode' => 'WinGo_30S']);
+
+TestRunner::equals('game code echoed', 'WinGo_30S', $sched['gameCode']);
+TestRunner::equals('interval in minutes', 0.5, $sched['intervalMinute']);
+TestRunner::ok('previous/current/next present', isset($sched['previous'], $sched['current'], $sched['next']));
+TestRunner::ok('timestamps are epoch millis', $sched['current']['startTime'] > 1000000000000);
+TestRunner::equals('current round end', strtotime('2026-09-01 08:00:00') * 1000, $sched['current']['endTime']);
+TestRunner::equals('next round follows on', $sched['current']['endTime'], $sched['next']['startTime']);
+TestRunner::equals('previous round precedes', $sched['current']['startTime'], $sched['previous']['endTime']);
+TestRunner::equals('countdown', 3, $sched['remaining']);
+TestRunner::equals('issue numbers are ours', 17, strlen($sched['current']['issueNumber']));
+
+Clock::unfreeze();

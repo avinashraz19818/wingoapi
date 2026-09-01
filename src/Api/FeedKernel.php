@@ -102,6 +102,10 @@ class FeedKernel
             case 'getgameissue':
                 return $controller->issue($game);
 
+            case 'schedule':
+            case 'getissueschedule':
+                return $controller->schedule($game);
+
             case 'result':
             case 'getresult':
                 return $controller->result($game);

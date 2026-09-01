@@ -105,6 +105,36 @@ class FeedController
         ];
     }
 
+    /**
+     * Issue schedule in the shape the stock front-ends poll
+     * (/webapi/kv/issue/WinGo_30S): previous / current / next with epoch-ms
+     * timestamps. Returned raw, without our envelope, by the site proxy.
+     */
+    public function schedule(GameDefinition $game): array
+    {
+        $now       = Clock::now();
+        $current   = $this->app->scheduler()->current($game, $now);
+        $previous  = $this->app->scheduler()->previous($game, $now);
+        $next      = $this->app->scheduler()->next($game, $now);
+
+        $shape = static fn($issue): array => [
+            'issueNumber' => $issue->issueNumber,
+            'startTime'   => $issue->startTs * 1000,
+            'endTime'     => $issue->endTs * 1000,
+        ];
+
+        return [
+            'gameCode'       => $game->code,
+            'intervalMinute' => round($game->seconds / 60, 2),
+            'state'          => $game->state,
+            'serverTime'     => $now * 1000,
+            'remaining'      => $current->remainingSeconds($now),
+            'previous'       => $shape($previous),
+            'current'        => $shape($current),
+            'next'           => $shape($next),
+        ];
+    }
+
     /** One specific round. */
     public function result(GameDefinition $game): array
     {
