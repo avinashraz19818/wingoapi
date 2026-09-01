@@ -126,7 +126,28 @@ class GameRegistry
         return $game;
     }
 
-    /** Accepts "5D_1M", "wingo_1m", "WinGo1M" and normalises to canonical form. */
+    /**
+     * Interval spellings seen in the wild: 1Min, 1min, 1_Min, 30Sec, 30s …
+     */
+    public const INTERVAL_ALIASES = [
+        '30SEC'  => '30S',
+        '30SECS' => '30S',
+        '30S'    => '30S',
+        '1MIN'   => '1M',
+        '1MINUTE'=> '1M',
+        '3MIN'   => '3M',
+        '5MIN'   => '5M',
+        '10MIN'  => '10M',
+        '1M'     => '1M',
+        '3M'     => '3M',
+        '5M'     => '5M',
+        '10M'    => '10M',
+    ];
+
+    /**
+     * Accepts "5D_1M", "wingo_1m", "WinGo1M", "WinGo_1Min", "5D_1Min",
+     * "MotoRace_1Min" … and normalises to the canonical code.
+     */
     public function normaliseCode(string $gameCode): string
     {
         $gameCode = trim($gameCode);
@@ -134,7 +155,7 @@ class GameRegistry
             return '';
         }
         if (!str_contains($gameCode, '_')) {
-            if (preg_match('/^([A-Za-z]+)(\d+[SM])$/i', $gameCode, $m)) {
+            if (preg_match('/^([A-Za-z]+?)(\d+\s*(?:S|SEC|SECS|M|MIN|MINUTE)S?)$/i', $gameCode, $m)) {
                 $gameCode = $m[1] . '_' . $m[2];
             } else {
                 return $gameCode;
@@ -143,7 +164,8 @@ class GameRegistry
 
         [$family, $interval] = explode('_', $gameCode, 2);
         $family   = self::FAMILY_ALIASES[strtolower($family)] ?? $family;
-        $interval = strtoupper($interval);
+        $interval = strtoupper(str_replace([' ', '-', '_'], '', $interval));
+        $interval = self::INTERVAL_ALIASES[$interval] ?? $interval;
 
         return $family . '_' . $interval;
     }

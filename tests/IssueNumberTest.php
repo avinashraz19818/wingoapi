@@ -67,3 +67,33 @@ TestRunner::equals('normalise lowercase', 'WinGo_1M', $registry->normaliseCode('
 TestRunner::equals('game count', 18, count($registry->all()));
 
 Clock::unfreeze();
+
+TestRunner::group('Game codes — spellings used by real front-ends');
+
+$reg = makeTestApp()->registry();
+
+foreach ([
+    'WinGo_1Min'     => 'WinGo_1M',
+    'WinGo_1min'     => 'WinGo_1M',
+    'WinGo_3Min'     => 'WinGo_3M',
+    'WinGo_5Min'     => 'WinGo_5M',
+    'WinGo_10Min'    => 'WinGo_10M',
+    'WinGo_30S'      => 'WinGo_30S',
+    'WinGo_30Sec'    => 'WinGo_30S',
+    '5D_1Min'        => 'D5_1M',
+    '5D_1M'          => 'D5_1M',
+    'D5_1Min'        => 'D5_1M',
+    'K3_1Min'        => 'K3_1M',
+    'MotoRace_1Min'  => 'MotoRace_1M',
+    'TrxWinGo_1M'    => 'TrxWinGo_1M',
+    'trxwingo_1min'  => 'TrxWinGo_1M',
+    'WinGo1M'        => 'WinGo_1M',
+    'WinGo30S'       => 'WinGo_30S',
+] as $input => $expected) {
+    TestRunner::equals("normalise {$input}", $expected, $reg->normaliseCode($input));
+}
+
+// And they must all resolve to a real game
+foreach (['WinGo_1Min', '5D_1Min', 'K3_1Min', 'MotoRace_1Min', 'WinGo_30Sec'] as $input) {
+    TestRunner::ok("{$input} resolves", $reg->find($input) !== null);
+}
