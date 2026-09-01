@@ -17,27 +17,40 @@ final class Security
         }
 
         $allowed = $config['cors_origins'] ?? ['*'];
-        $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $origin  = (string) ($_SERVER['HTTP_ORIGIN'] ?? '');
+        $any     = in_array('*', $allowed, true);
 
-        if (in_array('*', $allowed, true)) {
-            header('Access-Control-Allow-Origin: *');
-        } elseif ($origin !== '' && in_array($origin, $allowed, true)) {
+        header('Vary: Origin, Access-Control-Request-Headers');
+
+        if ($origin !== '' && ($any || in_array($origin, $allowed, true))) {
+            // Echo the exact origin rather than "*": browsers reject the
+            // wildcard as soon as a request carries credentials, which is what
+            // most game front-ends do.
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Access-Control-Allow-Credentials: true');
-            header('Vary: Origin');
-        } else {
-            header('Vary: Origin');
+        } elseif ($any) {
+            header('Access-Control-Allow-Origin: *');
         }
 
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Signature, X-Timestamp, X-Admin-Token');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
         header('Access-Control-Max-Age: 86400');
+        header('Access-Control-Expose-Headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-Feed-Domain');
+
+        // Reflect whatever headers the browser asked for; front-ends send all
+        // sorts of custom ones (token, language, deviceId, traceId …) and a
+        // missing entry here shows up as a bare "CORS error" in the console.
+        $requested = (string) ($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'] ?? '');
+        header('Access-Control-Allow-Headers: ' . ($requested !== '' ? $requested : implode(', ', [
+            'Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With',
+            'Token', 'X-Token', 'X-Access-Token', 'Access-Token', 'Auth', 'X-Auth-Token',
+            'X-Api-Key', 'X-Signature', 'X-Timestamp', 'X-Admin-Token',
+            'Language', 'Lang', 'Device-Id', 'DeviceId', 'Trace-Id', 'TraceId', 'Version',
+        ])));
 
         header('Content-Type: application/json; charset=utf-8');
         header('X-Content-Type-Options: nosniff');
         header('X-Frame-Options: DENY');
         header('Referrer-Policy: no-referrer');
-        header('Cross-Origin-Resource-Policy: same-site');
         header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
         header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
         header('Cache-Control: no-store, no-cache, must-revalidate');

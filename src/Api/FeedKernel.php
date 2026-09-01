@@ -123,15 +123,20 @@ class FeedKernel
         header('Content-Type: application/json; charset=utf-8');
         header('X-Content-Type-Options: nosniff');
         header('Referrer-Policy: no-referrer');
-        header('Vary: Origin');
+        header('Vary: Origin, Access-Control-Request-Headers');
         header('Cache-Control: public, max-age=2');
         header_remove('X-Powered-By');
 
         if ($origin !== '' && $access !== null && $access['allowed']) {
             header('Access-Control-Allow-Origin: ' . $origin);
-            header('Access-Control-Allow-Methods: GET, OPTIONS');
-            header('Access-Control-Allow-Headers: Content-Type, X-Api-Key');
+            header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
             header('Access-Control-Max-Age: 86400');
+
+            $requested = (string) ($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'] ?? '');
+            header('Access-Control-Allow-Headers: ' . ($requested !== ''
+                ? $requested
+                : 'Content-Type, Authorization, X-Api-Key, Accept, Language, X-Requested-With'));
         }
 
         if ($access !== null && $access['domain'] !== null) {

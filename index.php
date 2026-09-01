@@ -40,6 +40,16 @@ if (preg_match('#(^|/)index\.php$#i', $uri)) {
 
 $app = App::boot();
 
+/* --------------------------------------------------------------- preflight
+ | Answer every CORS preflight the same way, whatever the path — an OPTIONS
+ | that falls through to a 404 shows up in the browser as a bare "CORS error".
+ */
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    Security::applyHeaders((array) $app->config('security'));
+    http_response_code(204);
+    exit;
+}
+
 /* ------------------------------------------------------------- main API */
 
 /*
