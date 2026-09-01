@@ -43,6 +43,8 @@ $drawProfiles = [
         'families'  => [],
         'headers'   => [],
         'prefixes'  => [],
+        // Families the provider actually serves (empty = try them all).
+        'supports'  => [],
         // Day boundary used for the issue sequence (empty = app timezone).
         'issue_tz'  => '',
     ],
@@ -55,6 +57,8 @@ $drawProfiles = [
             '{base}/{family}/{code}/GetNoaverageEmerdList.json',
         ],
         'families'  => [],
+        // They publish these four; MotoRace is drawn locally.
+        'supports'  => ['WinGo', 'TrxWinGo', 'K3', 'D5'],
         // Their sequence restarts at 00:00 UTC (05:30 IST), not local midnight.
         'issue_tz'  => 'UTC',
         'headers'   => [
@@ -162,6 +166,7 @@ return [
     'draw_url_templates'=> $profile['templates'],
     // Family name as it appears in the provider path (e.g. D5 -> 5D).
     'draw_family_names' => $profile['families'],
+    'draw_supported_families' => $profile['supports'] ?? [],
     'draw_headers'      => $profile['headers'],
     // Timezone whose midnight starts the issue sequence (upstream parity).
     'issue_timezone'    => Env::get('ISSUE_TIMEZONE', (string) ($profile['issue_tz'] ?? '')),

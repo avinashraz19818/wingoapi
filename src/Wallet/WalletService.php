@@ -154,19 +154,23 @@ class WalletService
                     );
                 }
                 $after = Money::round($before - $amount);
+                // Lifetime counters track *play*, not housekeeping: a manual
+                // adjustment or a transfer must not look like a wager or a win.
+                $countsAsStake = $refType === 'bet';
                 $db->execute(
                     'UPDATE ' . Tables::WALLETS . '
                         SET balance = ?, total_stake = total_stake + ?, version = version + 1, updated_at = ?
                       WHERE user_id = ?',
-                    [Money::format($after), Money::format($amount), Clock::dateTime(), $userId]
+                    [Money::format($after), Money::format($countsAsStake ? $amount : 0), Clock::dateTime(), $userId]
                 );
             } else {
-                $after = Money::round($before + $amount);
+                $after          = Money::round($before + $amount);
+                $countsAsPayout = $refType === 'payout';
                 $db->execute(
                     'UPDATE ' . Tables::WALLETS . '
                         SET balance = ?, total_payout = total_payout + ?, version = version + 1, updated_at = ?
                       WHERE user_id = ?',
-                    [Money::format($after), Money::format($amount), Clock::dateTime(), $userId]
+                    [Money::format($after), Money::format($countsAsPayout ? $amount : 0), Clock::dateTime(), $userId]
                 );
             }
 

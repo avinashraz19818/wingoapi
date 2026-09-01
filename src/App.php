@@ -136,7 +136,8 @@ class App
             (array) ($this->config['draw_url_templates'] ?? [$this->config['draw_url_template']]),
             (bool) ($this->config['draw_enabled'] ?? true),
             (int) ($this->config['draw_failure_cooldown'] ?? 60),
-            (array) ($this->config['draw_family_names'] ?? [])
+            (array) ($this->config['draw_family_names'] ?? []),
+            (array) ($this->config['draw_supported_families'] ?? [])
         ));
     }
 

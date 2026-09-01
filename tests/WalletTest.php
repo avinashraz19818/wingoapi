@@ -40,8 +40,17 @@ TestRunner::nearly('balance_after tracked', 749.5, (float) $entries[0]['balance_
 
 $snapshot = $wallet->snapshot($userId);
 TestRunner::equals('snapshot balance is formatted', '749.50', $snapshot['balance']);
-TestRunner::equals('total stake tracked', '250.50', $snapshot['totalStake']);
-TestRunner::equals('total payout tracked', '1000.00', $snapshot['totalPayout']);
+TestRunner::equals('a bet counts towards lifetime stake', '250.50', $snapshot['totalStake']);
+TestRunner::equals('an adjustment is not counted as winnings', '0.00', $snapshot['totalPayout']);
+
+// Only real settlements move the payout counter.
+$wallet->credit($userId, 300.0, 'test:payout:1', 'payout', 'BET1', 'win');
+$wallet->credit($userId, 100.0, 'test:transfer:1', 'transfer_in', 'ORD1', 'deposit');
+$counters = $wallet->snapshot($userId);
+TestRunner::equals('winnings counted', '300.00', $counters['totalPayout']);
+TestRunner::equals('a transfer is not counted as winnings', '300.00', $counters['totalPayout']);
+TestRunner::equals('a transfer is not counted as stake', '250.50', $counters['totalStake']);
+TestRunner::nearly('balance still adds up', 1149.5, $wallet->balance($userId));
 
 $k1 = WalletService::entryKey('bet', '1', 'g', 'r');
 $k2 = WalletService::entryKey('bet', '1', 'g', 'r');

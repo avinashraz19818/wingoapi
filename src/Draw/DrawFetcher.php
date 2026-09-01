@@ -38,6 +38,8 @@ class DrawFetcher
     private array $templates;
     /** @var array<string,string> our family => provider family */
     private array $familyNames;
+    /** @var array<int,string> families the provider serves (empty = all) */
+    private array $supported;
     private bool $enabled;
     private int $cooldown;
 
@@ -55,8 +57,10 @@ class DrawFetcher
         $template = '{base}/{game}/{interval}.json',
         bool $enabled = true,
         int $cooldown = 60,
-        array $familyNames = []
+        array $familyNames = [],
+        array $supportedFamilies = []
     ) {
+        $this->supported = $supportedFamilies;
         $this->http        = $http;
         $this->rules       = $rules;
         $this->baseUrl     = rtrim($baseUrl, '/');
@@ -88,6 +92,22 @@ class DrawFetcher
     public function enabled(): bool
     {
         return $this->enabled;
+    }
+
+    /**
+     * Does the upstream publish this game at all?
+     *
+     * Asking for a game the provider does not have wastes a request per round
+     * and, worse, can match another family's rows through the date+sequence
+     * fallback — so those games go straight to the local generator.
+     */
+    public function servesGame(GameDefinition $game): bool
+    {
+        if (!$this->enabled) {
+            return false;
+        }
+
+        return $this->supported === [] || in_array($game->family, $this->supported, true);
     }
 
     /** Provider-side family name, e.g. D5 -> 5D. */
@@ -171,7 +191,7 @@ class DrawFetcher
      */
     public function fetchRows(GameDefinition $game): ?array
     {
-        if (!$this->enabled) {
+        if (!$this->servesGame($game)) {
             return null;
         }
 

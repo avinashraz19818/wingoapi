@@ -330,3 +330,46 @@ TestRunner::equals('WinGo falls back to premium', 4, $wgRules->fromProvider(['nu
 TestRunner::ok('WinGo ignores an unusable row', $wgRules->fromProvider(['number' => '', 'premium' => '']) === null);
 
 Clock::unfreeze();
+
+TestRunner::group('Feed — only mirror what the upstream serves');
+
+$supApp = makeTestApp([
+    'draw_base_url'           => 'https://draw.ar-lottery01.com',
+    'draw_supported_families' => ['WinGo', 'TrxWinGo', 'K3', 'D5'],
+]);
+$supFetcher = $supApp->fetcher();
+
+TestRunner::ok('WinGo is mirrored', $supFetcher->servesGame($supApp->registry()->get('WinGo_1M')));
+TestRunner::ok('K3 is mirrored', $supFetcher->servesGame($supApp->registry()->get('K3_5M')));
+TestRunner::ok('MotoRace is not requested upstream', !$supFetcher->servesGame($supApp->registry()->get('MotoRace_1M')));
+
+/** Counts requests so we can prove nothing is sent for unsupported games. */
+final class CountingHttp2 extends \Lottery\Support\Http
+{
+    public int $calls = 0;
+    public function __construct() { parent::__construct(1); }
+    public function fetchArray(string $url, array $headers = []): ?array { $this->calls++; return null; }
+}
+
+$counter2 = new CountingHttp2();
+$skipFetcher = new \Lottery\Draw\DrawFetcher(
+    $counter2, new RulesFactory(), 'https://draw.ar-lottery01.com',
+    ['{base}/{family}/{code}/GetHistoryIssuePage.json'], true, 60, [], ['WinGo']
+);
+
+Clock::freeze(strtotime('2026-09-01 12:05:30'));
+$skipFetcher->fetchIssue($supApp->registry()->get('MotoRace_1M'), '20260901500010001');
+TestRunner::equals('no request is made for an unsupported family', 0, $counter2->calls);
+
+$skipFetcher->fetchIssue($supApp->registry()->get('WinGo_1M'), '20260901100010001');
+TestRunner::equals('a supported family is still fetched', 1, $counter2->calls);
+
+// With no list configured every family is tried (generic providers).
+$openFetcher = new \Lottery\Draw\DrawFetcher(
+    new CountingHttp2(), new RulesFactory(), 'https://draw.example.net',
+    ['{base}/{game}/{interval}.json'], true, 60, [], []
+);
+TestRunner::ok('an unrestricted provider serves everything',
+    $openFetcher->servesGame($supApp->registry()->get('MotoRace_1M')));
+
+Clock::unfreeze();
