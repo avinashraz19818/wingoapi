@@ -41,6 +41,17 @@ Admin panel → **Settings** → add:
 
 ## Check
 
+Upload `_lottery_upstream_check.php` next to the other `api/` files and open:
+
+```
+https://your-site.com/api/_lottery_upstream_check.php
+```
+
+It names the exact missing step (file not loaded / setting empty / engine
+unreachable / domain not whitelisted). Delete the file afterwards.
+
+Then confirm the live routes:
+
 ```
 https://your-site.com/webapi/kv/issue/WinGo_30S
 https://your-site.com/WinGo/WinGo_30S/GetHistoryIssuePage.json
