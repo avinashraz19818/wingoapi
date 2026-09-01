@@ -28,21 +28,24 @@ unset($query['action'], $query['path'], $query['gameCode']);
 $target  = null;
 $unwrap  = false;   // strip our envelope and return `data` directly
 
+// Everything is answered by the compatibility endpoint, which speaks this
+// front-end's own dialect (msg "Succeed", msgCode 0, premium/openCode, …).
+
 // 1. /webapi/kv/issue/WinGo_30S  (countdown + current issue)
 if (preg_match('#/webapi/(?:kv|v)/issue/([A-Za-z0-9_]+)#i', $path, $m)) {
-    $target = LOTTERY_BASE . '/api/Feed?action=Schedule&gameCode=' . rawurlencode($m[1]);
-    $unwrap = true;
+    $target = LOTTERY_BASE . '/api/Compat?action=GetGameIssue&gameCode=' . rawurlencode($m[1]);
+    $unwrap = true;   // this one is served bare, without an envelope
 
 // 2. /WinGo/WinGo_30S/GetHistoryIssuePage.json  (results list)
 } elseif (preg_match('#/(WinGo|TrxWinGo|K3|D5|MotoRace)/([A-Za-z0-9_]+)/([A-Za-z0-9_]+)\.json#i', $path, $m)) {
-    $target = LOTTERY_BASE . '/api/Feed?action=' . rawurlencode($m[3]) . '&gameCode=' . rawurlencode($m[2]);
+    $target = LOTTERY_BASE . '/api/Compat?action=' . rawurlencode($m[3]) . '&gameCode=' . rawurlencode($m[2]);
 
-// 3. /api/Lottery/GetBalance  (everything else)
+// 3. /api/Lottery/GetBalance, /api/Lottery/WinGoBet, …
 } elseif (preg_match('#/api/Lottery/([A-Za-z0-9_]+)#i', $path, $m)) {
-    $target = LOTTERY_BASE . '/api/Lottery?action=' . rawurlencode($m[1]);
+    $target = LOTTERY_BASE . '/api/Compat?action=' . rawurlencode($m[1]);
 } elseif (isset($_GET['action'])) {
     $action = preg_replace('/[^A-Za-z0-9_]/', '', (string) $_GET['action']) ?? '';
-    $target = $action === '' ? null : LOTTERY_BASE . '/api/Lottery?action=' . rawurlencode($action);
+    $target = $action === '' ? null : LOTTERY_BASE . '/api/Compat?action=' . rawurlencode($action);
 }
 
 if ($target === null) {

@@ -20,6 +20,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 
 use Lottery\Api\AdminKernel;
+use Lottery\Api\CompatKernel;
 use Lottery\Api\FeedKernel;
 use Lottery\Api\Kernel;
 use Lottery\App;
@@ -151,6 +152,12 @@ if (
     }
 
     (new Kernel($app))->handle();
+    exit;
+}
+
+/* ------------------------------------------- AR-compatible front-ends */
+if (preg_match('#^/api/compat$#i', $uri)) {
+    (new CompatKernel($app))->handle();
     exit;
 }
 
