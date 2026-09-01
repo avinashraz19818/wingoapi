@@ -108,57 +108,76 @@ class ArCompatController
      |  Catalogue
      * ================================================================ */
 
-    /** GetGameList — grouped by family, as the client renders its tabs. */
+    /**
+     * GetGameList.
+     *
+     * These clients sort tabs by `sort` descending, and the original payload
+     * numbered them per family (WinGo 44,43,42… K3 34,33…), so the shortest
+     * round comes first. The same numbering is reproduced here, otherwise the
+     * tabs come out reversed (10 Min first, 30sec last).
+     */
+    private const GAME_TYPES  = ['WinGo' => 100, 'K3' => 101, 'D5' => 102, 'TrxWinGo' => 103, 'MotoRace' => 105];
+    private const GAME_LABELS = ['WinGo' => 'WinGo', 'K3' => 'K3', 'D5' => '5D', 'TrxWinGo' => 'TrxWinGo', 'MotoRace' => 'MotoRace'];
+    private const GROUP_SORT  = ['WinGo' => 1, 'MotoRace' => 2, 'D5' => 4, 'K3' => 5, 'TrxWinGo' => 6];
+    private const GAME_SORT_BASE = ['WinGo' => 40, 'K3' => 30, 'D5' => 20, 'TrxWinGo' => 10, 'MotoRace' => 6];
+
     public function gameList(): array
     {
         $groups = [];
-        $types  = ['WinGo' => 100, 'K3' => 101, 'D5' => 102, 'TrxWinGo' => 103, 'MotoRace' => 105];
-        $labels = ['WinGo' => 'WinGo', 'K3' => 'K3', 'D5' => '5D', 'TrxWinGo' => 'TrxWinGo', 'MotoRace' => 'MotoRace'];
-        $sort   = 1;
 
         foreach ($this->app->registry()->grouped() as $family => $games) {
-            $list = [];
+            $allowed = [];
             foreach ($games as $game) {
-                if (!$this->isAllowed($game->code)) {
-                    continue;
+                if ($this->isAllowed($game->code)) {
+                    $allowed[] = $game;
                 }
-                $minutes = $game->seconds / 60;
-                $label   = $minutes < 1
-                    ? $game->seconds . 'sec'
-                    : rtrim(rtrim(number_format($minutes, 1, '.', ''), '0'), '.') . ' Min';
-
-                $list[] = [
-                    'gameCode'           => $game->code,
-                    'lotteryCode'        => $family,
-                    'name'               => $labels[$family] . ' ' . $label,
-                    'gameName'           => $labels[$family] . ' ' . $label,
-                    'gameNameEn'         => $labels[$family] . ' ' . $label,
-                    'gameTypeName'       => $labels[$family],
-                    'status'             => $game->state,
-                    'state'              => $game->state,
-                    'intervalMinute'     => $minutes,
-                    'sort'               => $game->sort,
-                    'isGameMaintenance'  => false,
-                    'isPlatMaintenance'  => false,
-                ];
             }
-
-            if ($list === []) {
+            if ($allowed === []) {
                 continue;
             }
 
+            $label = self::GAME_LABELS[$family] ?? $family;
+            $base  = self::GAME_SORT_BASE[$family] ?? 10;
+            $count = count($allowed);
+            $list  = [];
+
+            foreach ($allowed as $index => $game) {
+                $minutes = $game->seconds / 60;
+                $name    = $label . ' ' . ($minutes < 1
+                    ? $game->seconds . 'sec'
+                    : rtrim(rtrim(number_format($minutes, 1, '.', ''), '0'), '.') . ' Min');
+
+                $list[] = [
+                    'gameCode'          => $game->code,
+                    'lotteryCode'       => $family,
+                    'name'              => $name,
+                    'gameName'          => $name,
+                    'gameNameEn'        => $name,
+                    'gameTypeName'      => $label,
+                    'status'            => $game->state,
+                    'state'             => $game->state,
+                    'intervalMinute'    => $minutes,
+                    // descending: the first (shortest) round gets the highest
+                    'sort'              => $base + ($count - $index),
+                    'isGameMaintenance' => false,
+                    'isPlatMaintenance' => false,
+                ];
+            }
+
             $groups[] = [
-                'gameType'     => $types[$family] ?? 100,
-                'gameTypeName' => $labels[$family] ?? $family,
+                'gameType'     => self::GAME_TYPES[$family] ?? 100,
+                'gameTypeName' => $label,
                 'lotteryCode'  => $family,
                 'gameCode'     => $family,
                 'categoryCode' => $family,
-                'categoryName' => $labels[$family] ?? $family,
-                'name'         => $labels[$family] ?? $family,
-                'sort'         => $sort++,
+                'categoryName' => $label,
+                'name'         => $label,
+                'sort'         => self::GROUP_SORT[$family] ?? 9,
                 'gameList'     => $list,
             ];
         }
+
+        usort($groups, static fn(array $a, array $b): int => $a['sort'] <=> $b['sort']);
 
         return self::ok($groups);
     }

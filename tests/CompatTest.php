@@ -171,8 +171,19 @@ $records = $call('GetRecordPage', ['gameCode' => 'WinGo_1M', 'pageSize' => 10], 
 TestRunner::equals('records returned', 4, $records['data']['totalCount']);
 TestRunner::ok('record row shape', isset($records['data']['list'][0]['orderNo'], $records['data']['list'][0]['betAmount'], $records['data']['list'][0]['state']));
 
+// A read without an identity must not break the game screen: it answers zero
+// rather than an error toast.
 $noAuth = $call('GetBalance', ['gameCode' => 'WinGo_1M']);
-TestRunner::equals('balance without a token fails cleanly', -1, $noAuth['code']);
+TestRunner::equals('balance without a token still renders', 0, $noAuth['code']);
+TestRunner::equals('…as zero', 0.0, $noAuth['data']['balance']);
+
+$noAuthRecords = $call('GetRecordPage', ['gameCode' => 'WinGo_1M']);
+TestRunner::equals('records without a token are empty, not an error', 0, $noAuthRecords['data']['totalCount']);
+
+// Betting, however, must refuse.
+$noAuthBet = $call('WinGoBet', ['gameCode' => 'WinGo_1M', 'amount' => 10, 'betContent' => 'Color_red']);
+TestRunner::equals('betting without a token is refused', -1, $noAuthBet['code']);
+TestRunner::equals('…with their login code', 315, $noAuthBet['msgCode']);
 
 TestRunner::group('AR compatibility — settlement through the client dialect');
 
@@ -256,3 +267,43 @@ foreach ($siteApp->registry()->all() as $g) {
 }
 TestRunner::equals('MotoRace now has four rounds',
     ['MotoRace_1M', 'MotoRace_3M', 'MotoRace_5M', 'MotoRace_10M'], $motoCodes);
+
+TestRunner::group('AR compatibility — tab order matches the original site');
+
+$orderApp    = makeTestApp();
+$orderKernel = new CompatKernel($orderApp);
+$_SERVER['REQUEST_METHOD'] = 'GET';
+unset($_SERVER['HTTP_X_API_KEY'], $_SERVER['HTTP_AUTHORIZATION']);
+
+$order = $orderKernel->dispatch('getgamelist', ['action' => 'GetGameList']);
+
+$wingo = null;
+foreach ($order['data'] as $group) {
+    if ($group['lotteryCode'] === 'WinGo') {
+        $wingo = $group;
+    }
+}
+
+TestRunner::ok('WinGo group found', $wingo !== null);
+TestRunner::equals('WinGo is the first tab', 1, $wingo['sort']);
+TestRunner::equals('WinGo gameType', 100, $wingo['gameType']);
+
+// These clients order by sort descending, so 30sec must carry the highest.
+$sorts = array_column($wingo['gameList'], 'sort', 'gameCode');
+TestRunner::ok('30sec sorts before 1M', $sorts['WinGo_30S'] > $sorts['WinGo_1M']);
+TestRunner::ok('1M sorts before 3M', $sorts['WinGo_1M'] > $sorts['WinGo_3M']);
+TestRunner::ok('3M sorts before 5M', $sorts['WinGo_3M'] > $sorts['WinGo_5M']);
+TestRunner::ok('5M sorts before 10M', $sorts['WinGo_5M'] > $sorts['WinGo_10M']);
+TestRunner::equals('the shortest round tops the list, like the original', 45, $sorts['WinGo_30S']);
+
+$k3 = null;
+foreach ($order['data'] as $group) {
+    if ($group['lotteryCode'] === 'K3') { $k3 = $group; }
+}
+$k3Sorts = array_column($k3['gameList'], 'sort', 'gameCode');
+TestRunner::ok('K3 1M sorts before K3 10M', $k3Sorts['K3_1M'] > $k3Sorts['K3_10M']);
+TestRunner::ok('K3 sits below WinGo', $k3['sort'] > $wingo['sort']);
+
+$names = array_column($wingo['gameList'], 'name', 'gameCode');
+TestRunner::equals('30sec label', 'WinGo 30sec', $names['WinGo_30S']);
+TestRunner::equals('1 minute label', 'WinGo 1 Min', $names['WinGo_1M']);

@@ -94,9 +94,19 @@ class CompatKernel
             'getmybetrecord', 'getbetrecord',
         ], true) || str_ends_with($action, 'bet');
 
-        $user = $needsUser
-            ? $this->app->auth()->requireUser(null, $input)
-            : $this->app->auth()->optionalUser(null, $input);
+        $user = $this->app->auth()->optionalUser(null, $input);
+
+        if ($needsUser && $user === null) {
+            // Reads degrade to an empty/zero answer so the game screen still
+            // renders; anything that moves money refuses properly.
+            if (!str_ends_with($action, 'bet')) {
+                Log::warning('compat: unidentified player, answering empty', ['action' => $action]);
+
+                return $this->guestAnswer($action);
+            }
+
+            $this->app->auth()->requireUser(null, $input);   // throws with the real reason
+        }
 
         $controller = new ArCompatController($this->app, $input, $user, $this->allowedGames($input));
         $game       = $this->game($input);
@@ -157,6 +167,24 @@ class CompatKernel
         }
 
         return array_values(array_filter(array_map('trim', explode(',', (string) $domain['games']))));
+    }
+
+    /** What a read-only call gets when we could not identify the player. */
+    private function guestAnswer(string $action): array
+    {
+        if ($action === 'getbalance') {
+            return ArCompatController::ok(['balance' => 0.0]);
+        }
+        if ($action === 'getuserinfo') {
+            return ArCompatController::ok([
+                'userId' => 0, 'nickName' => 'Guest', 'vipLevel' => 0,
+                'walletBalance' => 0.0, 'balance' => 0.0, 'amount' => 0.0,
+            ]);
+        }
+
+        return ArCompatController::ok([
+            'list' => [], 'pageNo' => 1, 'pageSize' => 10, 'totalCount' => 0, 'totalPage' => 0,
+        ]);
     }
 
     private function game(array $input): ?\Lottery\Games\GameDefinition
