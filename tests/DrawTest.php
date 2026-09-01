@@ -316,3 +316,72 @@ TestRunner::ok('an unsupported game does not wait', $motoDrawn !== null);
 TestRunner::equals('and is drawn locally', 'local', $motoDrawn['source']);
 
 Clock::unfreeze();
+
+TestRunner::group('Draws — a long-running worker keeps polling');
+
+/** Publishes one new round each time the clock moves on. */
+final class RollingProviderStub extends \Lottery\Support\Http
+{
+    public int $calls = 0;
+    /** @var array<string,string> issue => number */
+    public array $published = [];
+    public function __construct() { parent::__construct(5); }
+    public function fetchArray(string $url, array $headers = []): ?array
+    {
+        $this->calls++;
+        $rows = [];
+        foreach ($this->published as $issue => $number) {
+            $rows[] = ['issueNumber' => $issue, 'number' => $number];
+        }
+        return ['list' => $rows];
+    }
+}
+
+Clock::freeze(strtotime('2026-09-01 12:00:40'));
+
+$dayApp  = makeTestApp(['draw_base_url' => 'https://draw.example.net']);
+$dayGame = $dayApp->registry()->get('WinGo_1M');
+$rolling = new RollingProviderStub();
+
+$rollingFetcher = new \Lottery\Draw\DrawFetcher(
+    $rolling, new RulesFactory(), 'https://draw.example.net',
+    ['{base}/{game}/{interval}.json'], true, 0, []
+);
+$rollingDraws = new \Lottery\Draw\DrawService(
+    $dayApp->db(), new RulesFactory(), $dayApp->scheduler(), $rollingFetcher,
+    new LocalDrawGenerator('s', new RulesFactory()), $dayApp->overrides(), false, 25
+);
+
+// Round A closed at 12:00:00 and the provider has it.
+$issueA = $dayApp->scheduler()->issueAt($dayGame, strtotime('2026-09-01 11:59:30'));
+$rolling->published[$issueA->issueNumber] = '4';
+$a = $rollingDraws->ensureResult($dayGame, $issueA);
+TestRunner::equals('first round mirrored', 'remote', $a['source']);
+
+// A minute later the provider publishes round B. Still inside the grace
+// period, so nothing is written yet — but the cached page cannot see it.
+Clock::freeze(strtotime('2026-09-01 12:01:10'));
+$issueB = $dayApp->scheduler()->issueAt($dayGame, strtotime('2026-09-01 12:00:30'));
+$rolling->published[$issueB->issueNumber] = '9';
+
+$callsBefore = $rolling->calls;
+$stale       = $rollingDraws->ensureResult($dayGame, $issueB);
+TestRunner::ok('a cached page cannot see the new round', $stale === null);
+TestRunner::equals('and the provider was not even asked', $callsBefore, $rolling->calls);
+
+$rollingDraws->flushProviderCache();
+$b = $rollingDraws->ensureResult($dayGame, $issueB);
+TestRunner::ok('after flushing, the provider is asked again', $rolling->calls > $callsBefore);
+TestRunner::ok('and the new round is mirrored', $b !== null && $b['source'] === 'remote',
+    'source=' . ($b['source'] ?? 'null'));
+TestRunner::equals('with the provider number', 9, (int) $b['primary_number']);
+
+// The grace period never eats a whole short round.
+$shortApp   = makeTestApp(['draw_base_url' => 'https://draw.example.net', 'draw_fallback_delay' => 25]);
+$shortGame  = $shortApp->registry()->get('WinGo_30S');   // 30s rounds
+$shortIssue = $shortApp->scheduler()->previous($shortGame);
+Clock::freeze($shortIssue->endTs + 14);                  // 14s after it closed
+$short = $shortApp->draws()->ensureResult($shortGame, $shortIssue);
+TestRunner::ok('a 30s round is settled within ~12s of closing', $short !== null);
+
+Clock::unfreeze();

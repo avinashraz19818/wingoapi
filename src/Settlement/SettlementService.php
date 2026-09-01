@@ -115,6 +115,9 @@ class SettlementService
         $now      = $now ?? Clock::now();
         $reports  = [];
 
+        // Start every sweep with a fresh view of the provider.
+        $this->draws->flushProviderCache();
+
         foreach (array_reverse($this->scheduler->recentClosed($game, $lookback, $now)) as $issue) {
             $hasPending = (int) $this->db->fetchValue(
                 'SELECT COUNT(*) FROM ' . Tables::BETS . ' WHERE game_code = ? AND issue_number = ? AND status = ?',

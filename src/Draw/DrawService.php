@@ -57,6 +57,19 @@ class DrawService
         $this->forceRemote = $forceRemote;
     }
 
+    /**
+     * Forget the provider's cached response.
+     *
+     * The fetcher memoises each endpoint for the lifetime of the process so a
+     * single request never hits the provider twice. The worker, however, is a
+     * daemon: without this it would keep serving the same ten rows it fetched
+     * at boot and every later round would look "not published yet".
+     */
+    public function flushProviderCache(): void
+    {
+        $this->fetcher->flush();
+    }
+
     /** Stored result row (decoded) or null. */
     public function find(GameDefinition $game, string $issueNumber): ?array
     {
@@ -144,10 +157,12 @@ class DrawService
 
         // The provider publishes a round a few seconds after it closes. Drawing
         // locally the instant the timer hits zero would mean our numbers never
-        // match theirs, so hold off briefly for games they actually serve.
-        if ($endTs > 0
-            && $this->fetcher->servesGame($game)
-            && ($now - $endTs) < $this->fallbackDelay) {
+        // match theirs, so hold off briefly for games they actually serve —
+        // but never for longer than a fraction of the round itself, or a 30s
+        // game would spend most of its life unsettled.
+        $grace = min($this->fallbackDelay, max(5, (int) round($game->seconds * 0.4)));
+
+        if ($endTs > 0 && $this->fetcher->servesGame($game) && ($now - $endTs) < $grace) {
             return null;
         }
 

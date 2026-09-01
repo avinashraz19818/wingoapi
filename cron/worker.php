@@ -41,13 +41,16 @@ $say = static function (string $message) use ($quiet): void {
     }
 };
 
-$pass = static function () use ($registry, $settlement, $follow, $only, $say): void {
+$pass = static function () use ($app, $registry, $settlement, $follow, $only, $say): void {
     foreach ($registry->all() as $game) {
         if ($only !== '' && strcasecmp($only, $game->code) !== 0) {
             continue;
         }
 
         try {
+            // The daemon lives for days; never reuse a cached provider page.
+            $app->draws()->flushProviderCache();
+
             $reports = $settlement->settleDue($game, 10, Clock::now());
             foreach ($reports as $report) {
                 if ($report['settled'] && $report['bets'] > 0) {
