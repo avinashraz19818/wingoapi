@@ -80,6 +80,43 @@ if ((int) ($answer['code'] ?? -1) !== 0) {
     exit;
 }
 
+/* 3b. can we identify a player? */
+$probeToken = (string) ($_GET['token'] ?? '');
+if ($probeToken !== '') {
+    echo "\nResolving the supplied token…\n";
+
+    $pdo = api_pdo();
+    $row = null;
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("SELECT user_id, nickname, wallet_balance, game_balance FROM api_users WHERE token = ? LIMIT 1");
+            $stmt->execute([$probeToken]);
+            $row = $stmt->fetch() ?: null;
+        } catch (Throwable $e) {
+        }
+    }
+
+    $line('token belongs to', $row ? ('user ' . $row['user_id'] . ' (' . $row['nickname'] . ')') : 'NOBODY — token not in api_users', (bool) $row);
+
+    if ($row) {
+        $line('site wallet', $row['wallet_balance']);
+        $line('site game balance', $row['game_balance']);
+
+        $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $probeToken;
+        $engineBalance = lottery_upstream_call('GetBalance', []);
+        $line(
+            'engine game wallet',
+            $engineBalance === null ? 'call failed' : ($engineBalance['data']['balance'] ?? 'n/a'),
+            $engineBalance !== null
+        );
+        echo "\n  (this is what the game screen shows — move money with Transfer\n";
+        echo "   or from the engine panel to change it)\n";
+    }
+} else {
+    echo "\nTip: add ?token=<a real value from localStorage.ar_token> to this URL\n";
+    echo "     to see which player it resolves to and what the game shows them.\n";
+}
+
 /* 4. what the site itself would answer */
 $local = api_lottery_issue_data('WinGo_30S');
 $line('local issue number', $local['issueNumber']);
