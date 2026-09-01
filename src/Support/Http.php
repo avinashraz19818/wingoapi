@@ -45,6 +45,57 @@ class Http
     }
 
     /**
+     * POST a JSON body and decode the answer. Null on any failure.
+     */
+    public function postArray(string $url, array $body, array $headers = []): ?array
+    {
+        $payload = json_encode($body, JSON_UNESCAPED_SLASHES);
+        $headers = array_merge($this->defaultHeaders, $headers, ['Content-Type: application/json']);
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $payload,
+                CURLOPT_TIMEOUT        => $this->timeout,
+                CURLOPT_CONNECTTIMEOUT => min($this->timeout, 3),
+                CURLOPT_SSL_VERIFYPEER => $this->verifySsl,
+                CURLOPT_SSL_VERIFYHOST => $this->verifySsl ? 2 : 0,
+                CURLOPT_USERAGENT      => $this->userAgent,
+                CURLOPT_HTTPHEADER     => $headers,
+            ]);
+            $raw    = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error  = curl_errno($ch) !== 0 ? curl_error($ch) : null;
+            curl_close($ch);
+
+            if ($error !== null || $status < 200 || $status >= 300 || !is_string($raw)) {
+                Log::warning('partner POST failed', ['url' => $url, 'status' => $status, 'error' => $error]);
+                return null;
+            }
+            $decoded = json_decode($raw, true);
+
+            return is_array($decoded) ? $decoded : null;
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method'        => 'POST',
+                'timeout'       => $this->timeout,
+                'ignore_errors' => true,
+                'header'        => implode("\r\n", $headers),
+                'content'       => $payload,
+            ],
+            'ssl' => ['verify_peer' => $this->verifySsl, 'verify_peer_name' => $this->verifySsl],
+        ]);
+        $raw     = @file_get_contents($url, false, $context);
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
      * Fetch + decode. Returns null on any transport or decode failure.
      */
     public function fetchArray(string $url, array $headers = []): ?array

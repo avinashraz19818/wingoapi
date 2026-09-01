@@ -453,6 +453,24 @@ class Migrator
             'ALTER TABLE ' . Tables::DOMAINS . ' ADD COLUMN player_secret VARCHAR(191) NULL',
         ];
 
+        /* ---------- v6: verify a partner's own opaque tokens (introspection) */
+        $m[6] = [
+            'ALTER TABLE ' . Tables::DOMAINS . ' ADD COLUMN validate_url VARCHAR(255) NULL',
+            'ALTER TABLE ' . Tables::DOMAINS . ' ADD COLUMN validate_method VARCHAR(8) NULL',
+            'ALTER TABLE ' . Tables::DOMAINS . ' ADD COLUMN validate_ttl {INT} NOT NULL DEFAULT 300',
+
+            'CREATE TABLE IF NOT EXISTS ' . Tables::TOKEN_CACHE . ' (
+                id {PK},
+                token_hash VARCHAR(64) NOT NULL UNIQUE,
+                domain_id {BIGINT} NOT NULL,
+                user_id {BIGINT} NOT NULL,
+                external_id VARCHAR(64) NOT NULL,
+                expires_at {DATETIME} NOT NULL,
+                created_at {DATETIME} NOT NULL DEFAULT {NOW}
+            ){ENGINE}',
+            'CREATE INDEX idx_token_cache_exp ON ' . Tables::TOKEN_CACHE . ' (expires_at)',
+        ];
+
         return $m;
     }
 

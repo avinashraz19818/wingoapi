@@ -269,7 +269,8 @@ class App
             $this->domains(),
             $this->jwt(),
             $this->wallet(),
-            $this->vip()
+            $this->vip(),
+            $this->http()
         ));
     }
 

@@ -176,8 +176,16 @@ class Authenticator
 
         /** @var PartnerService $partners */
         $partners = ($this->partnerResolver)();
+        $host     = \Lottery\Tenant\DomainService::hostOf($origin);
 
-        return $partners->resolvePartnerToken($token, \Lottery\Tenant\DomainService::hostOf($origin));
+        // 1) a JWT signed with the partner's shared secret
+        $user = $partners->resolvePartnerToken($token, $host);
+        if ($user !== null) {
+            return $user;
+        }
+
+        // 2) an opaque token: ask the partner's own API who owns it
+        return $partners->resolveIntrospectedToken($token, $host);
     }
 
     /** Users are provisioned on first authenticated call. */

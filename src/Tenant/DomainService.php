@@ -120,9 +120,18 @@ class DomainService
             $games = array_values(array_filter(array_map('trim', explode(',', $games))));
         }
 
+        $validateUrl = array_key_exists('validateUrl', $input)
+            ? trim((string) $input['validateUrl'])
+            : (string) ($row['validate_url'] ?? '');
+
+        if ($validateUrl !== '' && !filter_var($validateUrl, FILTER_VALIDATE_URL)) {
+            throw ApiException::validation('validateUrl must be a full URL, e.g. https://your-site.com/api/User/GetUserInfo');
+        }
+
         $this->db->execute(
             'UPDATE ' . Tables::DOMAINS . '
-                SET domain = ?, label = ?, games = ?, note = ?, status = ?, rate_limit = ?, expires_at = ?
+                SET domain = ?, label = ?, games = ?, note = ?, status = ?, rate_limit = ?, expires_at = ?,
+                    player_secret = ?, validate_url = ?, validate_method = ?, validate_ttl = ?
               WHERE id = ?',
             [
                 $domain,
@@ -132,6 +141,12 @@ class DomainService
                 isset($input['status']) ? ((int) $input['status'] === 1 ? 1 : 0) : (int) $row['status'],
                 isset($input['rateLimit']) ? max(0, (int) $input['rateLimit']) : (int) $row['rate_limit'],
                 $input['expiresAt'] ?? $row['expires_at'],
+                array_key_exists('playerSecret', $input)
+                    ? (trim((string) $input['playerSecret']) ?: null)
+                    : ($row['player_secret'] ?? null),
+                $validateUrl ?: null,
+                strtoupper((string) ($input['validateMethod'] ?? $row['validate_method'] ?? 'POST')) === 'GET' ? 'GET' : 'POST',
+                max(30, (int) ($input['validateTtl'] ?? $row['validate_ttl'] ?? 300)),
                 $id,
             ]
         );
@@ -379,7 +394,11 @@ class DomainService
             'rateLimit'   => (int) $row['rate_limit'],
             'requests'    => (int) $row['requests_total'],
             'blocked'     => (int) $row['blocked_total'],
-            'note'        => $row['note'],
+            'note'          => $row['note'],
+            'validateUrl'    => $row['validate_url'] ?? null,
+            'validateMethod' => $row['validate_method'] ?? 'POST',
+            'validateTtl'    => (int) ($row['validate_ttl'] ?? 300),
+            'hasPlayerSecret'=> !empty($row['player_secret']),
             'expiresAt'   => $row['expires_at'],
             'lastSeenAt'  => $row['last_seen_at'],
             'createdAt'   => $row['created_at'],

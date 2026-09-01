@@ -138,3 +138,98 @@ $topUp = $call('PartnerTransfer', [
 TestRunner::equals('their mapped user can be funded', '50.00', $topUp['data']['balance']);
 
 Clock::unfreeze();
+
+TestRunner::group('Partner sites — verifying their own opaque tokens');
+
+$introApp = makeTestApp();
+$introKernel = new Kernel($introApp);
+$introDomains = $introApp->domains();
+
+$partnerSite = $introDomains->create('dhaniwin.club9.eu.cc', 'Dhani', [], '');
+$introDomains->update($partnerSite['id'], [
+    'validateUrl'    => 'https://dhaniwin.club9.eu.cc/api/User/GetUserInfo',
+    'validateMethod' => 'POST',
+    'validateTtl'    => 300,
+]);
+
+$stored = $introDomains->find($partnerSite['id']);
+TestRunner::equals('token check URL saved', 'https://dhaniwin.club9.eu.cc/api/User/GetUserInfo', $stored['validate_url']);
+TestRunner::equals('method saved', 'POST', $stored['validate_method']);
+
+TestRunner::throws('a bad URL is refused', static fn() => $introDomains->update($partnerSite['id'], ['validateUrl' => 'not-a-url']), 'full URL');
+
+// Their user endpoint, in the shape these platforms actually answer with.
+final class PartnerApiStub extends \Lottery\Support\Http
+{
+    public int $calls = 0;
+    public array $seenTokens = [];
+    private array $users;
+    public function __construct(array $users) { parent::__construct(5); $this->users = $users; }
+
+    public function postArray(string $url, array $body, array $headers = []): ?array
+    {
+        $this->calls++;
+        $token = '';
+        foreach ($headers as $header) {
+            if (stripos($header, 'Authorization: Bearer ') === 0) {
+                $token = substr($header, 22);
+            }
+        }
+        $this->seenTokens[] = $token;
+
+        if (!isset($this->users[$token])) {
+            return ['code' => 1, 'msg' => 'token invalid', 'data' => null];
+        }
+
+        return ['code' => 0, 'msg' => 'success', 'data' => [
+            'userId'   => $this->users[$token],
+            'userName' => 'Player ' . $this->users[$token],
+            'amount'   => '1500.00',
+        ]];
+    }
+}
+
+TestRunner::equals('user id found in a nested envelope', '99887',
+    \Lottery\Tenant\PartnerService::findUserId(['code' => 0, 'data' => ['userId' => 99887, 'nickName' => 'x']]));
+TestRunner::equals('uid is understood too', '5150',
+    \Lottery\Tenant\PartnerService::findUserId(['data' => ['userInfo' => ['uid' => '5150']]]));
+TestRunner::ok('an empty envelope yields nothing',
+    \Lottery\Tenant\PartnerService::findUserId(['code' => 0, 'data' => []]) === null);
+
+Clock::freeze(strtotime('2026-09-01 12:00:00'));
+
+$siteToken = 'local_6bb2051b34d06e9995ea0e5b2f8b140eaee7510';
+$stub      = new PartnerApiStub([$siteToken => 4242]);
+
+$partners = new \Lottery\Tenant\PartnerService(
+    $introApp->db(), $introDomains, $introApp->jwt(), $introApp->wallet(), $introApp->vip(), $stub
+);
+
+$resolved = $partners->resolveIntrospectedToken($siteToken, 'dhaniwin.club9.eu.cc');
+TestRunner::ok('their token identifies the player', $resolved !== null && $resolved['id'] > 0);
+TestRunner::equals('their API was asked once', 1, $stub->calls);
+TestRunner::equals('the token was forwarded', $siteToken, $stub->seenTokens[0]);
+
+$again = $partners->resolveIntrospectedToken($siteToken, 'dhaniwin.club9.eu.cc');
+TestRunner::equals('the same player comes back', $resolved['id'], $again['id']);
+TestRunner::equals('the answer is cached, their API is not called again', 1, $stub->calls);
+
+Clock::freeze(Clock::now() + 400);   // past validate_ttl
+$partners->resolveIntrospectedToken($siteToken, 'dhaniwin.club9.eu.cc');
+TestRunner::equals('after the cache expires their API is asked again', 2, $stub->calls);
+Clock::freeze(strtotime('2026-09-01 12:00:00'));
+
+TestRunner::ok('an unknown token is refused',
+    $partners->resolveIntrospectedToken('local_garbage', 'dhaniwin.club9.eu.cc') === null);
+TestRunner::ok('the token is useless from another origin',
+    $partners->resolveIntrospectedToken($siteToken, 'copycat.com') === null);
+
+// The mapped player behaves like any other: fund and bet
+$mapped = $resolved['id'];
+$introApp->wallet()->credit($mapped, 300, 'intro:1', 'transfer_in', null, 'test');
+TestRunner::equals('their user can be funded', 300.0, $introApp->wallet()->balance($mapped));
+
+$transfer = $partners->transfer($introDomains->find($partnerSite['id']), '4242', 200, 'in', 'ORD-1');
+TestRunner::equals('transfers reach the same player', '500.00', $transfer['balance']);
+
+Clock::unfreeze();

@@ -9,6 +9,7 @@ use Lottery\Database\Connection;
 use Lottery\Database\Tables;
 use Lottery\Support\ApiException;
 use Lottery\Support\Clock;
+use Lottery\Support\Http;
 use Lottery\Support\Log;
 use Lottery\Support\Money;
 use Lottery\Vip\VipService;
@@ -34,6 +35,8 @@ class PartnerService
 {
     private Connection $db;
     private DomainService $domains;
+    /** Injectable so tests (and ops tooling) can supply their own transport. */
+    private ?Http $http = null;
     private Jwt $jwt;
     private WalletService $wallet;
     private VipService $vip;
@@ -43,8 +46,10 @@ class PartnerService
         DomainService $domains,
         Jwt $jwt,
         WalletService $wallet,
-        VipService $vip
+        VipService $vip,
+        ?Http $http = null
     ) {
+        $this->http = $http;
         $this->db      = $db;
         $this->domains = $domains;
         $this->jwt     = $jwt;
@@ -253,6 +258,159 @@ class PartnerService
             'totalCount'     => $total,
             'list'           => array_map([\Lottery\Betting\BetService::class, 'presentBet'], $rows),
         ];
+    }
+
+    /**
+     * Verify an opaque token by asking the partner's own API who it belongs to
+     * ("token introspection").
+     *
+     * The partner does not have to change a single line: we call an endpoint
+     * they already have (e.g. /api/User/GetUserInfo) with the token the browser
+     * sent, and read the user id out of the answer. Successful lookups are
+     * cached for `validate_ttl` seconds so their API is not hammered.
+     *
+     * @return array{id:int,mobile:string}|null
+     */
+    public function resolveIntrospectedToken(string $token, string $originHost): ?array
+    {
+        $domain = $originHost === '' ? null : $this->domains->findByDomain($originHost);
+        if ($domain === null || (int) $domain['status'] !== 1 || empty($domain['validate_url'])) {
+            return null;
+        }
+
+        $cached = $this->cachedToken($token, (int) $domain['id']);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $externalId = $this->askPartnerWhoOwns($domain, $token);
+        if ($externalId === null) {
+            return null;
+        }
+
+        $userId = $this->resolveUserId($domain, $externalId);
+        $this->cacheToken($token, (int) $domain['id'], $userId, $externalId, (int) ($domain['validate_ttl'] ?: 300));
+
+        return ['id' => $userId, 'mobile' => 'p' . $domain['id'] . '_' . $externalId];
+    }
+
+    /**
+     * Call the partner's endpoint with the player's token and dig the user id
+     * out of whatever shape comes back.
+     */
+    private function askPartnerWhoOwns(array $domain, string $token): ?string
+    {
+        $url     = (string) $domain['validate_url'];
+        $method  = strtoupper((string) ($domain['validate_method'] ?: 'POST'));
+        $headers = [
+            'Authorization: Bearer ' . $token,
+            'Token: ' . $token,
+            'X-Token: ' . $token,
+            'Accept: application/json',
+        ];
+
+        $http = $this->http ?? new Http(6);
+
+        $payload = $method === 'GET'
+            ? $http->fetchArray($url . (str_contains($url, '?') ? '&' : '?') . 'token=' . urlencode($token), $headers)
+            : $http->postArray($url, ['token' => $token], $headers);
+
+        // If the configured verb fails, try the other one before giving up.
+        if ($payload === null) {
+            $payload = $method === 'GET'
+                ? $http->postArray($url, ['token' => $token], $headers)
+                : $http->fetchArray($url . (str_contains($url, '?') ? '&' : '?') . 'token=' . urlencode($token), $headers);
+        }
+
+        if ($payload === null) {
+            Log::warning('partner token introspection failed', ['domain' => $domain['domain'], 'url' => $url]);
+            return null;
+        }
+
+        // Some platforms answer 200 with an error envelope.
+        foreach (['code', 'status'] as $key) {
+            if (isset($payload[$key]) && is_numeric($payload[$key]) && (int) $payload[$key] !== 0 && (int) $payload[$key] !== 200) {
+                return null;
+            }
+        }
+
+        return self::findUserId($payload);
+    }
+
+    /**
+     * Depth-first search for the first plausible user id in a response.
+     *
+     * @param mixed $payload
+     */
+    public static function findUserId($payload, int $depth = 0): ?string
+    {
+        if ($depth > 4 || !is_array($payload)) {
+            return null;
+        }
+
+        foreach ([
+            'userId', 'userid', 'user_id', 'uid', 'memberId', 'member_id',
+            'id', 'userCode', 'account', 'userName',
+        ] as $key) {
+            if (isset($payload[$key]) && is_scalar($payload[$key])) {
+                $value = trim((string) $payload[$key]);
+                if ($value !== '' && $value !== '0' && preg_match('/^[A-Za-z0-9_\-.@]{1,64}$/', $value)) {
+                    return $value;
+                }
+            }
+        }
+
+        foreach (['data', 'result', 'userInfo', 'user', 'info', 'member'] as $key) {
+            if (isset($payload[$key]) && is_array($payload[$key])) {
+                $found = self::findUserId($payload[$key], $depth + 1);
+                if ($found !== null) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array{id:int,mobile:string}|null */
+    private function cachedToken(string $token, int $domainId): ?array
+    {
+        $row = $this->db->fetch(
+            'SELECT user_id, external_id, expires_at FROM ' . Tables::TOKEN_CACHE . '
+              WHERE token_hash = ? AND domain_id = ?',
+            [hash('sha256', $token), $domainId]
+        );
+
+        if ($row === null || strtotime((string) $row['expires_at']) < Clock::now()) {
+            return null;
+        }
+
+        return ['id' => (int) $row['user_id'], 'mobile' => 'p' . $domainId . '_' . $row['external_id']];
+    }
+
+    private function cacheToken(string $token, int $domainId, int $userId, string $externalId, int $ttl): void
+    {
+        $hash    = hash('sha256', $token);
+        $expires = date('Y-m-d H:i:s', Clock::now() + max(30, $ttl));
+
+        try {
+            $this->db->execute(
+                $this->db->insertIgnore() . ' ' . Tables::TOKEN_CACHE . '
+                    (token_hash, domain_id, user_id, external_id, expires_at, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?)',
+                [$hash, $domainId, $userId, $externalId, $expires, Clock::dateTime()]
+            );
+            $this->db->execute(
+                'UPDATE ' . Tables::TOKEN_CACHE . ' SET user_id = ?, external_id = ?, expires_at = ? WHERE token_hash = ?',
+                [$userId, $externalId, $expires, $hash]
+            );
+
+            if (random_int(1, 100) === 1) {
+                $this->db->execute('DELETE FROM ' . Tables::TOKEN_CACHE . ' WHERE expires_at < ?', [Clock::dateTime()]);
+            }
+        } catch (PDOException $e) {
+            // Caching is an optimisation, never a hard requirement.
+        }
     }
 
     /**

@@ -789,7 +789,13 @@ views.domains = async (state = {}) => {
         <label>Rate limit /min <input id="dm-rate" type="number" min="0" step="10" value="0" placeholder="0 = default"></label>
         <label>Expires <input id="dm-expires" placeholder="YYYY-MM-DD HH:MM:SS (optional)"></label>
         <label>Note <input id="dm-note" placeholder="plan / contact"></label>
+        <label>Token check URL <input id="dm-validate" placeholder="https://their-site.com/api/User/GetUserInfo"></label>
+        <label>Method <select id="dm-method"><option value="POST">POST</option><option value="GET">GET</option></select></label>
+        <label>Cache seconds <input id="dm-ttl" type="number" min="30" step="30" value="300"></label>
+        <label>Their JWT secret <input id="dm-secret" placeholder="only if they sign their own JWTs"></label>
       </div>
+      <p class="muted small mt">“Token check URL” lets players log in with the token their own site already gave them —
+      we ask that endpoint who the token belongs to. Leave blank if they use PartnerLogin instead.</p>
       <input type="hidden" id="dm-id" value="">
       <div class="btn-row mt">
         <button class="btn primary" id="dm-save">Save domain</button>
@@ -810,6 +816,9 @@ views.domains = async (state = {}) => {
         { label: 'API key', render: (r) => `<code class="small">${esc(r.apiKey.slice(0, 10))}…</code>
             <button class="btn small ghost" data-copy="${esc(r.apiKey)}">copy</button>` },
         { label: 'Games', render: (r) => r.games.length ? esc(r.games.join(', ')) : '<span class="muted small">all</span>' },
+        { label: 'Login', render: (r) => r.validateUrl
+            ? '<span class="pill ok">token check</span>'
+            : (r.hasPlayerSecret ? '<span class="pill ok">their JWT</span>' : '<span class="muted small">PartnerLogin</span>') },
         { label: 'Requests', num: true, render: (r) => Number(r.requests).toLocaleString('en-IN') },
         { label: 'Blocked', num: true, render: (r) => Number(r.blocked).toLocaleString('en-IN') },
         { label: 'Last seen', render: (r) => `<span class="muted small">${esc(r.lastSeenAt ?? 'never')}</span>` },
@@ -837,6 +846,10 @@ views.domains = async (state = {}) => {
         rateLimit: $('#dm-rate').value || 0,
         expiresAt: $('#dm-expires').value.trim(),
         note: $('#dm-note').value.trim(),
+        validateUrl: $('#dm-validate').value.trim(),
+        validateMethod: $('#dm-method').value,
+        validateTtl: $('#dm-ttl').value || 300,
+        playerSecret: $('#dm-secret').value.trim(),
       }, 'POST');
       toast('Saved ' + r.domain);
       modal('Feed access for ' + r.domain, `
@@ -859,6 +872,8 @@ views.domains = async (state = {}) => {
     $('#dm-id').value = d.id; $('#dm-domain').value = d.domain; $('#dm-label').value = d.label ?? '';
     $('#dm-games').value = d.games.join(','); $('#dm-rate').value = d.rateLimit;
     $('#dm-expires').value = d.expiresAt ?? ''; $('#dm-note').value = d.note ?? '';
+    $('#dm-validate').value = d.validateUrl ?? ''; $('#dm-method').value = d.validateMethod ?? 'POST';
+    $('#dm-ttl').value = d.validateTtl ?? 300;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
   $$('[data-toggle-domain]').forEach((b) => b.onclick = async () => {
