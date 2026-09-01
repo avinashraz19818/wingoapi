@@ -26,6 +26,7 @@ use Lottery\Support\Http;
 use Lottery\Support\Log;
 use Lottery\Support\RateLimiter;
 use Lottery\Tenant\DomainService;
+use Lottery\Tenant\PartnerService;
 use Lottery\Vip\VipService;
 use Lottery\Wallet\WalletService;
 
@@ -248,7 +249,8 @@ class App
         return $this->singleton(Authenticator::class, fn() => new Authenticator(
             $this->db(),
             $this->jwt(),
-            $this->wallet()
+            $this->wallet(),
+            fn() => $this->partners()
         ));
     }
 
@@ -257,6 +259,17 @@ class App
         return $this->singleton(DomainService::class, fn() => new DomainService(
             $this->db(),
             (string) $this->config('app.domain')
+        ));
+    }
+
+    public function partners(): PartnerService
+    {
+        return $this->singleton(PartnerService::class, fn() => new PartnerService(
+            $this->db(),
+            $this->domains(),
+            $this->jwt(),
+            $this->wallet(),
+            $this->vip()
         ));
     }
 

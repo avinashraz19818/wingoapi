@@ -190,6 +190,18 @@ class Kernel
             $this->app->signature()->verify($input);
         }
 
+        // Partner surface is authenticated by the site's API key.
+        if (in_array($normalised, LotteryController::PARTNER_ACTIONS, true)) {
+            $partner = $this->app->partners()->requirePartner($_SERVER, $input);
+
+            switch ($normalised) {
+                case 'partnerlogin':    return $controller->partnerLogin($partner);
+                case 'partnertransfer': return $controller->partnerTransfer($partner);
+                case 'partnerbalance':  return $controller->partnerBalance($partner);
+                case 'partnerbets':     return $controller->partnerBets($partner);
+            }
+        }
+
         $user = null;
 
         if (

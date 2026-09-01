@@ -29,6 +29,7 @@ Every response uses one envelope: `{data, code, msg, msgCode, serviceTime}`.
 | **Copy trading** | Curated plans (BigSmall, Color, K3 Big, 5D A-Big, TRX Green …); subscribers get one auto-bet per round with round budgets and duplicate protection. |
 | **Trends** | Missing count, open count, max continuous and current streak per option per position over the last 100 rounds. |
 | **Result feed (SaaS)** | Mirror an upstream provider (or draw locally) and republish results under **your own domain** in provider-compatible URLs. Customers never see the upstream. |
+| **Partner integration** | Sites that keep their own users/wallet plug in third-game style: `PartnerLogin` maps their user id to a player token, `PartnerTransfer` moves money in/out idempotently, or share an HS256 secret and we accept their own tokens. |
 | **Domain whitelist** | Only domains you whitelist can read the feed — enforced by Origin/Referer *and* per-customer API keys, with per-game plans, expiry dates, rate limits and usage counters. |
 | **Results board** | Public page at `/results` showing every game section with live countdowns and the latest draws. |
 | **Admin panel** | Web console at `/admin`: dashboard, live rounds with per-outcome risk exposure, one-click result overrides, users & wallets, immutable ledger, copy-trade plans, VIP, audit log. |
@@ -72,7 +73,7 @@ php cron/worker.php --loop      # daemon (systemd)
 php tests/run.php
 ```
 
-556 assertions covering issue numbering, all five rule engines, the HMAC draw
+605 assertions covering issue numbering, all five rule engines, the HMAC draw
 generator, provider parsing, overrides, wallet/ledger invariants, stake maths and
 limits, idempotency, settlement payouts and tax, VIP levels and backfill, copy
 trading, trend statistics, JWT/signature security, the full API surface and the
@@ -113,6 +114,7 @@ docs/                   API.md, DEPLOY.md
 - [`docs/API.md`](docs/API.md) — every endpoint, bet type, odds table and error code
 - [`docs/ADMIN.md`](docs/ADMIN.md) — the admin panel: sections, admin API, hardening
 - [`docs/FEED.md`](docs/FEED.md) — the result feed, upstream mirroring and the domain whitelist
+- [`docs/PARTNER.md`](docs/PARTNER.md) — integrating a site that already has its own users and wallet
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — VPS setup, TLS, worker, ops and security checklist
 
 ## Configuration

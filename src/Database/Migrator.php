@@ -434,6 +434,25 @@ class Migrator
             ){ENGINE}',
         ];
 
+        /* ------------------- v5: partner sites (third-game integration) */
+        $m[5] = [
+            'CREATE TABLE IF NOT EXISTS ' . Tables::PARTNER_USERS . ' (
+                id {PK},
+                domain_id {BIGINT} NOT NULL,
+                external_id VARCHAR(64) NOT NULL,
+                user_id {BIGINT} NOT NULL,
+                nickname VARCHAR(64) NULL,
+                created_at {DATETIME} NOT NULL DEFAULT {NOW},
+                last_login_at {DATETIME} NULL,
+                CONSTRAINT uq_partner_user UNIQUE (domain_id, external_id)
+            ){ENGINE}',
+            'CREATE INDEX idx_partner_local ON ' . Tables::PARTNER_USERS . ' (user_id)',
+
+            // Optional: a shared HS256 secret so we can accept the partner's
+            // own player tokens directly.
+            'ALTER TABLE ' . Tables::DOMAINS . ' ADD COLUMN player_secret VARCHAR(191) NULL',
+        ];
+
         return $m;
     }
 

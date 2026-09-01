@@ -26,7 +26,12 @@ class LotteryController
     private array $input;
 
     /** Public actions that still must be POSTed (they create state). */
-    public const PUBLIC_WRITE_ACTIONS = ['register', 'login'];
+    public const PUBLIC_WRITE_ACTIONS = ['register', 'login', 'partnerlogin', 'partnertransfer'];
+
+    /** Partner surface: authenticated by X-Api-Key, not by a player JWT. */
+    public const PARTNER_ACTIONS = [
+        'partnerlogin', 'partnertransfer', 'partnerbalance', 'partnerbets',
+    ];
 
     /** Actions that mutate state: POST + JWT + (optional) request signature. */
     public const WRITE_ACTIONS = [
@@ -54,6 +59,67 @@ class LotteryController
     {
         $this->app   = $app;
         $this->input = $input;
+    }
+
+    /* ===================================================================
+     |  Partner sites (third-game integration)
+     * ================================================================ */
+
+    /**
+     * POST ?action=PartnerLogin   (header X-Api-Key)
+     * {externalUserId, nickname?, mobile?} -> JWT for that user
+     */
+    public function partnerLogin(array $partner): array
+    {
+        return $this->app->partners()->login(
+            $partner,
+            $this->externalUserId(),
+            Validator::optionalString($this->input, 'nickname', '', 64),
+            Validator::optionalString($this->input, 'mobile', '', 20)
+        );
+    }
+
+    /**
+     * POST ?action=PartnerTransfer  (header X-Api-Key)
+     * {externalUserId, amount, direction: in|out, orderId}
+     */
+    public function partnerTransfer(array $partner): array
+    {
+        return $this->app->partners()->transfer(
+            $partner,
+            $this->externalUserId(),
+            (float) Validator::requireString($this->input, 'amount', 20),
+            Validator::requireString($this->input, 'direction', 8),
+            Validator::requireString($this->input, 'orderId', 64)
+        );
+    }
+
+    /** GET ?action=PartnerBalance&externalUserId=…  (header X-Api-Key) */
+    public function partnerBalance(array $partner): array
+    {
+        return $this->app->partners()->balance($partner, $this->externalUserId());
+    }
+
+    /** GET ?action=PartnerBets&externalUserId=…  (header X-Api-Key) */
+    public function partnerBets(array $partner): array
+    {
+        return $this->app->partners()->bets(
+            $partner,
+            $this->externalUserId(),
+            Validator::int($this->input, 'pageNo', 1, 1, 10000),
+            Validator::int($this->input, 'pageSize', 20, 1, 100)
+        );
+    }
+
+    private function externalUserId(): string
+    {
+        foreach (['externalUserId', 'external_user_id', 'userId', 'uid', 'memberId', 'account'] as $key) {
+            if (isset($this->input[$key]) && is_scalar($this->input[$key]) && trim((string) $this->input[$key]) !== '') {
+                return trim((string) $this->input[$key]);
+            }
+        }
+
+        throw ApiException::validation('Missing required parameter: externalUserId (your own user id)');
     }
 
     /* ===================================================================
@@ -548,6 +614,7 @@ class LotteryController
             self::AUTH_ACTIONS,
             self::ADMIN_ACTIONS,
             self::PUBLIC_WRITE_ACTIONS,
+            self::PARTNER_ACTIONS,
             [
                 'getgamelist', 'getgameinfo', 'getgameissue', 'gethistoryissuepage',
                 'gettrendstatistics', 'getfollowplanlist', 'health', 'logout', 'whoami',

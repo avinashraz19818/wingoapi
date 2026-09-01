@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lottery\Auth;
 
 use Lottery\Database\Connection;
+use Lottery\Tenant\PartnerService;
 use Lottery\Database\Tables;
 use Lottery\Support\ApiException;
 use Lottery\Support\Clock;
@@ -19,14 +20,17 @@ class Authenticator
     private Connection $db;
     private Jwt $jwt;
     private WalletService $wallet;
+    /** @var callable():PartnerService|null */
+    private $partnerResolver = null;
     private ?array $user = null;
     private string $userToken = '';
 
-    public function __construct(Connection $db, Jwt $jwt, WalletService $wallet)
+    public function __construct(Connection $db, Jwt $jwt, WalletService $wallet, ?callable $partnerResolver = null)
     {
-        $this->db     = $db;
-        $this->jwt    = $jwt;
-        $this->wallet = $wallet;
+        $this->db              = $db;
+        $this->jwt             = $jwt;
+        $this->wallet          = $wallet;
+        $this->partnerResolver = $partnerResolver;
     }
 
     /** @return array{id:int,mobile:string} */
@@ -35,11 +39,14 @@ class Authenticator
      */
     public function requireUser(array $server = null, array $input = []): array
     {
-        $token = $this->extractToken($server ?? $_SERVER, $input);
+        $server = $server ?? $_SERVER;
+        $token  = $this->extractToken($server, $input);
 
-        // Memoised per token: the same request may resolve the caller several
-        // times, but a different (or missing) token must be re-evaluated.
-        if ($this->user !== null && $token !== '' && $token === $this->userToken) {
+        // Memoised per token *and* origin: the same request may resolve the
+        // caller several times, but a different token — or the same token
+        // arriving from another site — must be re-evaluated.
+        $cacheKey = $token . '|' . (string) ($server['HTTP_ORIGIN'] ?? $server['HTTP_REFERER'] ?? '');
+        if ($this->user !== null && $token !== '' && $cacheKey === $this->userToken) {
             return $this->user;
         }
 
@@ -54,10 +61,20 @@ class Authenticator
             );
         }
 
-        $claims = $this->jwt->verify($token);
-        $user   = $this->resolveUser($claims['id'], $claims['mobile']);
+        try {
+            $claims = $this->jwt->verify($token);
+            $user   = $this->resolveUser($claims['id'], $claims['mobile']);
+        } catch (ApiException $e) {
+            // Not one of ours — it may be a token minted by a partner site
+            // that shares its player secret with us.
+            $user = $this->resolvePartnerUser($token, $server);
+            if ($user === null) {
+                throw $e;
+            }
+            $this->wallet->ensureWallet($user['id']);
+        }
 
-        $this->userToken = $token;
+        $this->userToken = $cacheKey;
 
         return $this->user = $user;
     }
@@ -143,6 +160,24 @@ class Authenticator
         }
 
         return true;
+    }
+
+    /** @return array{id:int,mobile:string}|null */
+    private function resolvePartnerUser(string $token, array $server): ?array
+    {
+        if ($this->partnerResolver === null) {
+            return null;
+        }
+
+        $origin = (string) ($server['HTTP_ORIGIN'] ?? $server['HTTP_REFERER'] ?? '');
+        if ($origin === '') {
+            return null;
+        }
+
+        /** @var PartnerService $partners */
+        $partners = ($this->partnerResolver)();
+
+        return $partners->resolvePartnerToken($token, \Lottery\Tenant\DomainService::hostOf($origin));
     }
 
     /** Users are provisioned on first authenticated call. */
