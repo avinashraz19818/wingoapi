@@ -261,6 +261,41 @@ class PartnerService
     }
 
     /**
+     * A partner that resolved the player itself (inside its own code, with its
+     * own session) can simply tell us who it is: the API key authenticates the
+     * site, `X-Player-Id` names the user. This is the accurate path — no
+     * guessing, no round trip.
+     *
+     * @return array{id:int,mobile:string}|null
+     */
+    public function resolveTrustedHeaderUser(array $server, array $input = []): ?array
+    {
+        $key = (string) ($server['HTTP_X_API_KEY'] ?? $input['key'] ?? $input['apiKey'] ?? '');
+        if ($key === '') {
+            return null;
+        }
+
+        $playerId = trim((string) (
+            $server['HTTP_X_PLAYER_ID'] ?? $input['externalUserId'] ?? $input['playerId'] ?? ''
+        ));
+        if ($playerId === '' || !preg_match('/^[A-Za-z0-9_\-.@]{1,64}$/', $playerId)) {
+            return null;
+        }
+
+        $domain = $this->domains->findByKey($key);
+        if ($domain === null || (int) $domain['status'] !== 1) {
+            return null;
+        }
+        if (!empty($domain['expires_at']) && strtotime((string) $domain['expires_at']) < Clock::now()) {
+            return null;
+        }
+
+        $userId = $this->resolveUserId($domain, $playerId);
+
+        return ['id' => $userId, 'mobile' => 'p' . $domain['id'] . '_' . $playerId];
+    }
+
+    /**
      * Verify an opaque token by asking the partner's own API who it belongs to
      * ("token introspection").
      *
@@ -285,6 +320,21 @@ class PartnerService
 
         $externalId = $this->askPartnerWhoOwns($domain, $token);
         if ($externalId === null) {
+            return null;
+        }
+
+        // Some platforms answer their "who am I" endpoint with a default user
+        // when the token is unknown. Trusting that would map every visitor to
+        // the same player, so probe with a junk token first and refuse to use
+        // an endpoint that cannot tell the difference.
+        $fallbackId = $this->probeFallbackId($domain);
+        if ($fallbackId !== null && $fallbackId === $externalId) {
+            Log::warning('partner token endpoint does not discriminate; refusing', [
+                'domain' => $domain['domain'],
+                'url'    => $domain['validate_url'],
+                'hint'   => 'install the site bridge so it sends X-Player-Id',
+            ]);
+
             return null;
         }
 
@@ -370,6 +420,46 @@ class PartnerService
         }
 
         return null;
+    }
+
+    /**
+     * What does the partner answer for a token that cannot exist? A well
+     * behaved endpoint answers "nobody"; a lenient one answers with its first
+     * user, and that id is then untrustworthy.
+     */
+    private function probeFallbackId(array $domain): ?string
+    {
+        $domainId = (int) $domain['id'];
+        $cacheKey = 'probe:' . $domainId . ':' . md5((string) $domain['validate_url']);
+
+        $row = $this->db->fetch(
+            'SELECT external_id, expires_at FROM ' . Tables::TOKEN_CACHE . ' WHERE token_hash = ?',
+            [$cacheKey]
+        );
+
+        if ($row !== null && strtotime((string) $row['expires_at']) > Clock::now()) {
+            return $row['external_id'] === '' ? null : (string) $row['external_id'];
+        }
+
+        $probe   = $this->askPartnerWhoOwns($domain, 'probe-' . bin2hex(random_bytes(12)));
+        $expires = date('Y-m-d H:i:s', Clock::now() + 600);
+
+        try {
+            $this->db->execute(
+                $this->db->insertIgnore() . ' ' . Tables::TOKEN_CACHE . '
+                    (token_hash, domain_id, user_id, external_id, expires_at, created_at)
+                 VALUES (?, ?, 0, ?, ?, ?)',
+                [$cacheKey, $domainId, (string) $probe, $expires, Clock::dateTime()]
+            );
+            $this->db->execute(
+                'UPDATE ' . Tables::TOKEN_CACHE . ' SET external_id = ?, expires_at = ? WHERE token_hash = ?',
+                [(string) $probe, $expires, $cacheKey]
+            );
+        } catch (PDOException $e) {
+            // caching the probe is an optimisation, not a requirement
+        }
+
+        return $probe;
     }
 
     /** @return array{id:int,mobile:string}|null */

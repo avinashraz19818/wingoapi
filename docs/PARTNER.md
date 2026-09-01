@@ -68,7 +68,23 @@ curl "https://api.example.com/api/Lottery?action=PartnerBalance&externalUserId=1
 curl "https://api.example.com/api/Lottery?action=PartnerBets&externalUserId=1001&pageSize=20" -H "X-Api-Key: <key>"
 ```
 
-## 4. Optional: keep using your own tokens
+## 4. Identifying the player accurately
+
+Three ways, in the order the engine tries them:
+
+1. **`X-Player-Id` + your API key** (best). Your backend already knows who is
+   logged in, so it just says so. Nothing can be misread.
+2. **A JWT signed with your shared `player_secret`**, sent from your domain.
+3. **Token introspection** — the engine asks your own "who am I" endpoint.
+
+> ⚠️ Many platforms answer their user endpoint with a *default* user when the
+> token is unknown. The engine probes for exactly that before trusting the
+> answer, and refuses introspection for such an endpoint — otherwise every
+> visitor would map onto the same player and share one balance. If you see
+> `partner token endpoint does not discriminate` in the log, install the site
+> bridge (it sends `X-Player-Id`) or make the endpoint reject bad tokens.
+
+## 5. Optional: keep using your own tokens
 
 If you would rather not call `PartnerLogin`, share an HS256 secret and we will
 accept the tokens your site already issues:

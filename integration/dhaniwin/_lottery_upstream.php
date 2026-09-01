@@ -39,6 +39,36 @@ function lottery_upstream_wallet(): bool
     return lottery_upstream_enabled() && api_setting_bool('lottery_upstream_wallet', true);
 }
 
+/**
+ * Who is the player, resolved here with a strict token lookup.
+ *
+ * api_primary_user() deliberately falls back to the first user when a token is
+ * unknown, which is fine for the site's own public routes but would make every
+ * visitor look like the same person to the engine. This lookup has no fallback.
+ */
+function lottery_upstream_player_id(): string
+{
+    $token = lottery_upstream_token();
+    if ($token === '') {
+        return '';
+    }
+
+    $pdo = api_pdo();
+    if (!$pdo) {
+        return '';
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT user_id FROM api_users WHERE token = ? LIMIT 1");
+        $stmt->execute([$token]);
+        $value = $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return '';
+    }
+
+    return $value === false ? '' : (string) $value;
+}
+
 /** The player's own token, exactly as the browser sent it. */
 function lottery_upstream_token(): string
 {
@@ -76,6 +106,14 @@ function lottery_upstream_call(string $action, array $input = [], string $method
     ];
     if ($token !== '') {
         $headers[] = 'Authorization: Bearer ' . $token;
+    }
+
+    // Tell the engine exactly which of our users this is. The API key above
+    // authenticates us, so it can trust this without a round trip — and two
+    // players can never be mistaken for one another.
+    $playerId = lottery_upstream_player_id();
+    if ($playerId !== '') {
+        $headers[] = 'X-Player-Id: ' . $playerId;
     }
 
     $ch = curl_init($url);
@@ -170,6 +208,11 @@ function lottery_upstream_transfer(array $input, bool $recover = false): array
 {
     $pdo  = api_pdo();
     $user = api_primary_user();
+
+    // Never move money for a session we could not verify.
+    if (lottery_upstream_player_id() === '') {
+        return api_error('Please sign in again', 315, -1);
+    }
 
     $balanceAnswer = lottery_upstream_call('GetBalance', $input);
     $gameBalance   = (float) ($balanceAnswer['data']['balance'] ?? 0);

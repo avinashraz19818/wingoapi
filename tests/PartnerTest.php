@@ -207,16 +207,17 @@ $partners = new \Lottery\Tenant\PartnerService(
 
 $resolved = $partners->resolveIntrospectedToken($siteToken, 'dhaniwin.club9.eu.cc');
 TestRunner::ok('their token identifies the player', $resolved !== null && $resolved['id'] > 0);
-TestRunner::equals('their API was asked once', 1, $stub->calls);
-TestRunner::equals('the token was forwarded', $siteToken, $stub->seenTokens[0]);
+// One probe (is this endpoint safe?) plus the real lookup.
+TestRunner::equals('their API was asked twice: probe + lookup', 2, $stub->calls);
+TestRunner::ok('the real token was forwarded', in_array($siteToken, $stub->seenTokens, true));
 
 $again = $partners->resolveIntrospectedToken($siteToken, 'dhaniwin.club9.eu.cc');
 TestRunner::equals('the same player comes back', $resolved['id'], $again['id']);
-TestRunner::equals('the answer is cached, their API is not called again', 1, $stub->calls);
+TestRunner::equals('the answer is cached, their API is not called again', 2, $stub->calls);
 
 Clock::freeze(Clock::now() + 400);   // past validate_ttl
 $partners->resolveIntrospectedToken($siteToken, 'dhaniwin.club9.eu.cc');
-TestRunner::equals('after the cache expires their API is asked again', 2, $stub->calls);
+TestRunner::equals('after the cache expires their API is asked again', 3, $stub->calls);
 Clock::freeze(strtotime('2026-09-01 12:00:00'));
 
 TestRunner::ok('an unknown token is refused',
@@ -289,3 +290,74 @@ $_SERVER['HTTP_ORIGIN'] = 'https://not-whitelisted.com';
 $diag2 = (new \Lottery\Api\LotteryController($whoApp, ['action' => 'Whoami']))->whoami();
 TestRunner::ok('Whoami names an unlisted domain', str_contains($diag2['hint'], 'not whitelisted'));
 unset($_SERVER['HTTP_ORIGIN'], $_SERVER['HTTP_AUTHORIZATION']);
+
+TestRunner::group('Partner sites — every player must resolve to themselves');
+
+$idApp     = makeTestApp();
+$idDomains = $idApp->domains();
+$idSite    = $idDomains->create('dhaniwin.club9.eu.cc', 'Dhani', [], '');
+
+/**
+ * The shape that caused the bug: the site answers with its *first* user
+ * whenever the token is unknown, so every visitor looked like the same player.
+ */
+final class LenientSiteStub extends \Lottery\Support\Http
+{
+    public function __construct() { parent::__construct(5); }
+    public function postArray(string $url, array $body, array $headers = []): ?array
+    {
+        return ['data' => ['userId' => 132257, 'nickName' => 'FirstUser']];
+    }
+}
+
+$idDomains->update($idSite['id'], [
+    'validateUrl'    => 'https://dhaniwin.club9.eu.cc/api/User/GetUserInfo',
+    'validateMethod' => 'POST',
+]);
+
+$lenient = new \Lottery\Tenant\PartnerService(
+    $idApp->db(), $idDomains, $idApp->jwt(), $idApp->wallet(), $idApp->vip(), new LenientSiteStub()
+);
+
+TestRunner::ok('a non-discriminating endpoint is refused',
+    $lenient->resolveIntrospectedToken('local_player_one', 'dhaniwin.club9.eu.cc') === null);
+TestRunner::ok('…for every token, not just one',
+    $lenient->resolveIntrospectedToken('local_player_two', 'dhaniwin.club9.eu.cc') === null);
+
+// The accurate path: the site resolved the player itself and says who it is.
+$server = ['HTTP_X_API_KEY' => $idSite['apiKey']];
+
+$one = $idApp->partners()->resolveTrustedHeaderUser($server + ['HTTP_X_PLAYER_ID' => '132257'], []);
+$two = $idApp->partners()->resolveTrustedHeaderUser($server + ['HTTP_X_PLAYER_ID' => '999888'], []);
+
+TestRunner::ok('player one resolves', $one !== null);
+TestRunner::ok('player two resolves', $two !== null);
+TestRunner::ok('and they are different players', $one['id'] !== $two['id']);
+TestRunner::equals('ids are namespaced per site', 'p' . $idSite['id'] . '_132257', $one['mobile']);
+
+$again = $idApp->partners()->resolveTrustedHeaderUser($server + ['HTTP_X_PLAYER_ID' => '132257'], []);
+TestRunner::equals('the same id always maps to the same player', $one['id'], $again['id']);
+
+TestRunner::ok('no API key means no trust',
+    $idApp->partners()->resolveTrustedHeaderUser(['HTTP_X_PLAYER_ID' => '132257'], []) === null);
+TestRunner::ok('a wrong API key means no trust',
+    $idApp->partners()->resolveTrustedHeaderUser(['HTTP_X_API_KEY' => str_repeat('b', 32), 'HTTP_X_PLAYER_ID' => '1'], []) === null);
+TestRunner::ok('no player id means no trust',
+    $idApp->partners()->resolveTrustedHeaderUser($server, []) === null);
+
+// Balances stay separate — the symptom that started this.
+$idApp->wallet()->credit($one['id'], 1500, 'sep:1', 'transfer_in', null, 'test');
+TestRunner::nearly('player one has their own balance', 1500.0, $idApp->wallet()->balance($one['id']));
+TestRunner::nearly('player two starts at zero', 0.0, $idApp->wallet()->balance($two['id']));
+
+// End to end through the API.
+$idKernel = new Kernel($idApp);
+$_SERVER['REQUEST_METHOD']  = 'GET';
+$_SERVER['HTTP_X_API_KEY']  = $idSite['apiKey'];
+unset($_SERVER['HTTP_AUTHORIZATION']);
+
+$_SERVER['HTTP_X_PLAYER_ID'] = '132257';
+$balanceOne = $idKernel->dispatch('getbalance', ['action' => 'GetBalance']);
+TestRunner::equals('player one sees their balance', '1500.00', $balanceOne['balance']);
+
+unset($_SERVER['HTTP_X_API_KEY'], $_SERVER['HTTP_X_PLAYER_ID']);

@@ -40,7 +40,17 @@ class Authenticator
     public function requireUser(array $server = null, array $input = []): array
     {
         $server = $server ?? $_SERVER;
-        $token  = $this->extractToken($server, $input);
+
+        // A partner that already knows who the player is tells us directly;
+        // this beats every token path and cannot be confused by a site whose
+        // own endpoint answers with a default user.
+        $trusted = $this->resolveTrustedUser($server, $input);
+        if ($trusted !== null) {
+            $this->wallet->ensureWallet($trusted['id']);
+            return $this->user = $trusted;
+        }
+
+        $token = $this->extractToken($server, $input);
 
         // Memoised per token *and* origin: the same request may resolve the
         // caller several times, but a different token — or the same token
@@ -160,6 +170,19 @@ class Authenticator
         }
 
         return true;
+    }
+
+    /** @return array{id:int,mobile:string}|null */
+    private function resolveTrustedUser(array $server, array $input): ?array
+    {
+        if ($this->partnerResolver === null) {
+            return null;
+        }
+
+        /** @var PartnerService $partners */
+        $partners = ($this->partnerResolver)();
+
+        return $partners->resolveTrustedHeaderUser($server, $input);
     }
 
     /** @return array{id:int,mobile:string}|null */
