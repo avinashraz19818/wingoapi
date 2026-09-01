@@ -353,7 +353,7 @@ final class CountingHttp2 extends \Lottery\Support\Http
 
 $counter2 = new CountingHttp2();
 $skipFetcher = new \Lottery\Draw\DrawFetcher(
-    $counter2, new RulesFactory(), 'https://draw.ar-lottery01.com',
+    $counter2, new \Lottery\Games\Families\RulesFactory(), 'https://draw.ar-lottery01.com',
     ['{base}/{family}/{code}/GetHistoryIssuePage.json'], true, 60, [], ['WinGo']
 );
 
@@ -366,7 +366,7 @@ TestRunner::equals('a supported family is still fetched', 1, $counter2->calls);
 
 // With no list configured every family is tried (generic providers).
 $openFetcher = new \Lottery\Draw\DrawFetcher(
-    new CountingHttp2(), new RulesFactory(), 'https://draw.example.net',
+    new CountingHttp2(), new \Lottery\Games\Families\RulesFactory(), 'https://draw.example.net',
     ['{base}/{game}/{interval}.json'], true, 60, [], []
 );
 TestRunner::ok('an unrestricted provider serves everything',
