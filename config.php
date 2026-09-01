@@ -117,7 +117,7 @@ $families = [
     'TrxWinGo'  => ['1M', '3M', '5M', '10M'],
     'K3'        => ['1M', '3M', '5M', '10M'],
     'D5'        => ['1M', '3M', '5M', '10M'],
-    'MotoRace'  => ['1M'],
+    'MotoRace'  => ['1M', '3M', '5M', '10M'],
 ];
 $sort = 0;
 foreach ($families as $family => $list) {

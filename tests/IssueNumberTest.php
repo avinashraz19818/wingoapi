@@ -64,7 +64,7 @@ TestRunner::throws('reject malformed issue number', static function () {
 
 TestRunner::equals('normalise 5D alias', 'D5_1M', $registry->normaliseCode('5D_1M'));
 TestRunner::equals('normalise lowercase', 'WinGo_1M', $registry->normaliseCode('wingo_1m'));
-TestRunner::equals('game count', 18, count($registry->all()));
+TestRunner::equals('game count', 21, count($registry->all()));
 
 Clock::unfreeze();
 

@@ -189,3 +189,70 @@ TestRunner::ok('win/loss carries the balance', isset($winLoss['data']['balance']
 TestRunner::ok('bets were settled', in_array($winLoss['data']['state'], [0, 1], true));
 
 Clock::unfreeze();
+
+TestRunner::group('AR compatibility — per-site game list & extra actions');
+
+$siteApp    = makeTestApp();
+$siteKernel = new CompatKernel($siteApp);
+
+// A site that only sells the four WinGo rounds its UI has room for.
+$site = $siteApp->domains()->create('dhaniwin.club9.eu.cc', 'Dhani', [
+    'WinGo_30S', 'WinGo_1M', 'WinGo_3M', 'WinGo_5M',
+], '');
+
+$callAs = static function (string $action, array $params = [], ?string $key = null, ?string $token = null) use ($siteKernel): array {
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    unset($_SERVER['HTTP_X_API_KEY'], $_SERVER['HTTP_AUTHORIZATION']);
+    if ($key !== null)   { $_SERVER['HTTP_X_API_KEY'] = $key; }
+    if ($token !== null) { $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token; }
+    try {
+        return $siteKernel->dispatch($action, $params + ['action' => $action]);
+    } catch (ApiException $e) {
+        return $siteKernel->errorPayload($e);
+    }
+};
+
+$full = $callAs('GetGameList');
+$allGames = 0;
+foreach ($full['data'] as $group) {
+    $allGames += count($group['gameList']);
+}
+TestRunner::equals('without a key every game is listed', 21, $allGames);
+
+$limited = $callAs('GetGameList', [], $site['apiKey']);
+$codes = [];
+foreach ($limited['data'] as $group) {
+    foreach ($group['gameList'] as $row) {
+        $codes[] = $row['gameCode'];
+    }
+}
+sort($codes);
+TestRunner::equals('the site only sees its own plan', ['WinGo_1M', 'WinGo_30S', 'WinGo_3M', 'WinGo_5M'], $codes);
+TestRunner::equals('empty families are dropped', 1, count($limited['data']));
+TestRunner::ok('WinGo_10M is hidden', !in_array('WinGo_10M', $codes, true));
+
+TestRunner::group('AR compatibility — actions the client calls extra');
+
+$token = $siteApp->jwt()->issue(9200, '9998887777');
+fundWallet($siteApp, 9200, 250.0);
+
+$info = $callAs('GetUserInfo', [], $site['apiKey'], $token);
+TestRunner::equals('GetUserInfo answers', 0, $info['code']);
+TestRunner::equals('GetUserInfo carries the balance', 250.0, $info['data']['balance']);
+TestRunner::ok('GetUserInfo has the fields the header reads', isset($info['data']['userId'], $info['data']['nickName'], $info['data']['walletBalance']));
+
+// An action nobody implemented must not blow up the screen.
+$unknown = $callAs('GetSomethingNobodyImplemented', [], $site['apiKey']);
+TestRunner::equals('unknown action still answers 0', 0, $unknown['code']);
+TestRunner::equals('unknown action msg', 'Succeed', $unknown['msg']);
+
+TestRunner::group('AR compatibility — MotoRace intervals');
+
+$motoCodes = [];
+foreach ($siteApp->registry()->all() as $g) {
+    if ($g->family === 'MotoRace') {
+        $motoCodes[] = $g->code;
+    }
+}
+TestRunner::equals('MotoRace now has four rounds',
+    ['MotoRace_1M', 'MotoRace_3M', 'MotoRace_5M', 'MotoRace_10M'], $motoCodes);

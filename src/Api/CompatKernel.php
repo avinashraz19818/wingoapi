@@ -91,13 +91,14 @@ class CompatKernel
         // the site's own token is introspected against its own API.
         $needsUser = in_array($action, [
             'getbalance', 'getrecordpage', 'getwinlossresult', 'getuserinfo',
+            'getmybetrecord', 'getbetrecord',
         ], true) || str_ends_with($action, 'bet');
 
         $user = $needsUser
             ? $this->app->auth()->requireUser(null, $input)
             : $this->app->auth()->optionalUser(null, $input);
 
-        $controller = new ArCompatController($this->app, $input, $user);
+        $controller = new ArCompatController($this->app, $input, $user, $this->allowedGames($input));
         $game       = $this->game($input);
 
         switch ($action) {
@@ -109,11 +110,17 @@ class CompatKernel
             case 'issue':
             case 'getgameissue':         return $controller->issue($this->requireGame($game));
             case 'getbalance':           return $controller->balance();
-            case 'getrecordpage':        return $controller->records($game);
+            case 'getuserinfo':          return $controller->userInfo();
+            case 'getrecordpage':
+            case 'getmybetrecord':
+            case 'getbetrecord':         return $controller->records($game);
             case 'getwinlossresult':     return $controller->winLoss($this->requireGame($game));
             case 'getbetlimit':          return $controller->betLimit();
             case 'getgameintroduce':     return $controller->introduce();
-            case 'getdragonlist':        return ArCompatController::ok([]);
+            case 'getdragonlist':
+            case 'getnoticelist':
+            case 'getactivitylist':      return ArCompatController::ok([]);
+            case 'getwingoliveurl2':     return ArCompatController::ok(['url' => '', 'isOpen' => false]);
             case 'getwingoliveurl':      return ArCompatController::ok(['url' => '', 'isOpen' => false]);
             case 'getfollowrule':        return ArCompatController::ok(['minAmount' => 1, 'maxAmount' => 100000, 'maxIssueCount' => 1000]);
         }
@@ -125,7 +132,31 @@ class CompatKernel
             return $controller->emptyPage();
         }
 
-        throw ApiException::notFound("Unknown action: {$action}");
+        // Anything else on the lottery base is answered with an empty, valid
+        // envelope: an unknown extra call must never break the game screen.
+        Log::warning('compat: unhandled action, answered empty', ['action' => $action]);
+
+        return ArCompatController::ok(null);
+    }
+
+    /**
+     * Games this site is allowed to show, from its whitelist entry.
+     *
+     * @return array<int,string>
+     */
+    private function allowedGames(array $input): array
+    {
+        $key = (string) ($_SERVER['HTTP_X_API_KEY'] ?? $input['key'] ?? $input['apiKey'] ?? '');
+        if ($key === '') {
+            return [];
+        }
+
+        $domain = $this->app->domains()->findByKey($key);
+        if ($domain === null || trim((string) ($domain['games'] ?? '')) === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', (string) $domain['games']))));
     }
 
     private function game(array $input): ?\Lottery\Games\GameDefinition

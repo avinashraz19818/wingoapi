@@ -231,6 +231,6 @@ TestRunner::group('API — health & schema');
 $health = $call('Health')['data'];
 TestRunner::equals('health status', 'ok', $health['status']);
 TestRunner::equals('schema at latest version', $app->migrator()->latestVersion(), $health['schemaVersion']);
-TestRunner::equals('all games registered', 18, $health['games']);
+TestRunner::equals('all games registered', 21, $health['games']);
 
 Clock::unfreeze();

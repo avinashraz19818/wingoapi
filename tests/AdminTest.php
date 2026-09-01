@@ -124,7 +124,7 @@ $app2->bets()->place($userId, ['gameCode' => 'WinGo_1M', 'betType' => 'number', 
 $app2->bets()->place($userId, ['gameCode' => 'WinGo_1M', 'betType' => 'size', 'betContent' => 'big', 'amount' => 50.0]);
 
 $games = $call('games', [], 'GET');
-TestRunner::equals('all games listed', 18, count($games['list']));
+TestRunner::equals('all games listed', 21, count($games['list']));
 $wingoRow = null;
 foreach ($games['list'] as $row) {
     if ($row['gameCode'] === 'WinGo_1M') { $wingoRow = $row; }

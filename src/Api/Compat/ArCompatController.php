@@ -25,12 +25,21 @@ class ArCompatController
     private array $input;
     /** @var array{id:int,mobile:string}|null */
     private ?array $user;
+    /** @var array<int,string> games this site may show (empty = all) */
+    private array $allowedGames;
 
-    public function __construct(App $app, array $input, ?array $user = null)
+    public function __construct(App $app, array $input, ?array $user = null, array $allowedGames = [])
     {
-        $this->app   = $app;
-        $this->input = $input;
-        $this->user  = $user;
+        $this->app          = $app;
+        $this->input        = $input;
+        $this->user         = $user;
+        $this->allowedGames = array_map('strtolower', $allowedGames);
+    }
+
+    /** A site can be limited to a subset of games (admin panel -> Domains). */
+    private function isAllowed(string $gameCode): bool
+    {
+        return $this->allowedGames === [] || in_array(strtolower($gameCode), $this->allowedGames, true);
     }
 
     /* ===================================================================
@@ -110,6 +119,9 @@ class ArCompatController
         foreach ($this->app->registry()->grouped() as $family => $games) {
             $list = [];
             foreach ($games as $game) {
+                if (!$this->isAllowed($game->code)) {
+                    continue;
+                }
                 $minutes = $game->seconds / 60;
                 $label   = $minutes < 1
                     ? $game->seconds . 'sec'
@@ -129,6 +141,10 @@ class ArCompatController
                     'isGameMaintenance'  => false,
                     'isPlatMaintenance'  => false,
                 ];
+            }
+
+            if ($list === []) {
+                continue;
             }
 
             $groups[] = [
@@ -357,6 +373,27 @@ class ArCompatController
     /* ===================================================================
      |  Wallet & betting
      * ================================================================ */
+
+    /** GetUserInfo — the lottery screen's own copy of the player header. */
+    public function userInfo(): array
+    {
+        $userId = $this->userId();
+        $wallet = $this->app->wallet()->snapshot($userId);
+        $vip    = $this->app->vip()->status($userId);
+
+        return self::ok([
+            'userId'        => $userId,
+            'nickName'      => 'Player' . $userId,
+            'userPhoto'     => '5',
+            'userType'      => 0,
+            'vipLevel'      => (int) $vip['level'],
+            'walletBalance' => (float) $wallet['balance'],
+            'balance'       => (float) $wallet['balance'],
+            'amount'        => (float) $wallet['balance'],
+            'safeBoxAmount' => 0.0,
+            'lastLoginTime' => Clock::nowMillis(),
+        ]);
+    }
 
     public function balance(): array
     {

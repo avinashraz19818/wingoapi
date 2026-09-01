@@ -134,7 +134,7 @@ TestRunner::ok('issue endpoint returns a countdown', $issue['remaining'] > 0 && 
 TestRunner::ok('issue endpoint includes the previous draw', $issue['lastIssue'] !== null);
 
 $games = $kernel->dispatch('gamelist', []);
-TestRunner::equals('game list covers every game', 18, count($games['list']));
+TestRunner::equals('game list covers every game', 21, count($games['list']));
 TestRunner::ok('game list exposes ready-made URLs', str_contains($games['list'][0]['endpoints']['history'], 'GetHistoryIssuePage.json'));
 
 $k3 = $feedApp->registry()->get('K3_1M');
