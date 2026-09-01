@@ -199,7 +199,7 @@ class Kernel
                 true
             )
         ) {
-            $user = $this->app->auth()->requireUser();
+            $user = $this->app->auth()->requireUser(null, $input);
         }
 
         switch ($normalised) {
@@ -213,6 +213,9 @@ class Kernel
 
             case 'logout':
                 return ['loggedOut' => true];
+
+            case 'whoami':
+                return $controller->whoami();
 
             case 'getuserinfo':
                 return $controller->getUserInfo($user);

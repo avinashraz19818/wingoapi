@@ -138,6 +138,8 @@ class PlayerAuth
             'status'     => (int) $row['status'],
             'createdAt'  => $row['created_at'],
             'balance'    => $wallet['balance'],
+            'amount'     => $wallet['balance'],
+            'uid'        => (int) $row['id'],
             'totalStake' => $wallet['totalStake'],
             'totalPayout'=> $wallet['totalPayout'],
             'vipLevel'   => $vip['level'],
@@ -200,15 +202,23 @@ class PlayerAuth
         $claims  = $this->jwt->verify($token);
         $balance = $this->wallet->balance($userId);
 
+        // The same values are repeated under the names different front-ends
+        // look for, so a client can be pointed at this API without edits.
         return [
-            'token'     => $token,
-            'tokenType' => 'Bearer',
-            'expiresIn' => max(0, (int) $claims['exp'] - Clock::now()),
-            'expiresAt' => date('Y-m-d H:i:s', (int) $claims['exp']),
-            'userId'    => $userId,
-            'mobile'    => $this->maskMobile($mobile),
-            'balance'   => Money::format($balance),
-            'vipLevel'  => (int) $this->vip->status($userId)['level'],
+            'token'       => $token,
+            'accessToken' => $token,
+            'userToken'   => $token,
+            'jwt'         => $token,
+            'tokenType'   => 'Bearer',
+            'expiresIn'   => max(0, (int) $claims['exp'] - Clock::now()),
+            'expiresAt'   => date('Y-m-d H:i:s', (int) $claims['exp']),
+            'userId'      => $userId,
+            'uid'         => $userId,
+            'id'          => $userId,
+            'mobile'      => $this->maskMobile($mobile),
+            'balance'     => Money::format($balance),
+            'amount'      => Money::format($balance),
+            'vipLevel'    => (int) $this->vip->status($userId)['level'],
         ];
     }
 

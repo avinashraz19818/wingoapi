@@ -135,3 +135,76 @@ TestRunner::throws('old password rejected after reset',
     static fn() => $adminApp->players()->login('9812340000', 'temp12345'), 'incorrect');
 
 Clock::unfreeze();
+
+TestRunner::group('Player accounts — front-end compatibility');
+
+$compatApp = makeTestApp();
+$compat    = new Kernel($compatApp);
+
+$call2 = static function (string $action, array $params = [], string $method = 'POST', array $server = []) use ($compat): array {
+    $_SERVER['REQUEST_METHOD'] = $method;
+    foreach (['HTTP_AUTHORIZATION', 'HTTP_TOKEN', 'HTTP_X_TOKEN', 'HTTP_X_ACCESS_TOKEN', 'HTTP_AUTH'] as $key) {
+        unset($_SERVER[$key]);
+    }
+    foreach ($server as $key => $value) {
+        $_SERVER[$key] = $value;
+    }
+    try {
+        return Response::success($compat->dispatch(strtolower($action), $params + ['action' => $action]));
+    } catch (ApiException $e) {
+        return Response::error($e->getMessage(), $e->getCode(), $e->msgCode());
+    }
+};
+
+// Register with alias field names (phone / pwd)
+$aliasReg = $call2('Register', ['phone' => '9811100022', 'pwd' => 'alias1234']);
+TestRunner::equals('register accepts phone + pwd', 0, $aliasReg['code']);
+
+$aliasLogin = $call2('Login', ['username' => '9811100022', 'passWord' => 'alias1234']);
+TestRunner::equals('login accepts username + passWord', 0, $aliasLogin['code']);
+$aliasToken = (string) $aliasLogin['data']['token'];
+
+TestRunner::ok('response repeats the token as accessToken', $aliasLogin['data']['accessToken'] === $aliasToken);
+TestRunner::ok('response repeats the token as userToken', $aliasLogin['data']['userToken'] === $aliasToken);
+TestRunner::ok('response repeats userId as uid', $aliasLogin['data']['uid'] === $aliasLogin['data']['userId']);
+
+TestRunner::equals('missing credentials name the aliases', 'VALIDATION_ERROR', $call2('Login', ['pwd' => 'x'])['msgCode']);
+
+// The token may arrive in several headers, or as a query parameter
+TestRunner::equals('token via Authorization header', 0,
+    $call2('GetBalance', [], 'GET', ['HTTP_AUTHORIZATION' => 'Bearer ' . $aliasToken])['code']);
+TestRunner::equals('token via bare Authorization header', 0,
+    $call2('GetBalance', [], 'GET', ['HTTP_AUTHORIZATION' => $aliasToken])['code']);
+TestRunner::equals('token via Token header', 0,
+    $call2('GetBalance', [], 'GET', ['HTTP_TOKEN' => $aliasToken])['code']);
+TestRunner::equals('token via X-Access-Token header', 0,
+    $call2('GetBalance', [], 'GET', ['HTTP_X_ACCESS_TOKEN' => $aliasToken])['code']);
+TestRunner::equals('token via query parameter', 0,
+    $call2('GetBalance', ['token' => $aliasToken], 'GET')['code']);
+
+// The failing call from the browser: signed GET with no token at all
+$signedNoToken = $call2('GetBalance', [
+    'language' => 'en', 'random' => '675425142947',
+    'signature' => '78987CDEA6ADE0534F0FF31B26284EC4', 'timestamp' => '1788225712',
+], 'GET');
+TestRunner::equals('signed request without a token still 401s', 'AUTH_REQUIRED', $signedNoToken['msgCode']);
+TestRunner::ok('401 explains what to do', str_contains($signedNoToken['msg'], 'action=Login'));
+
+TestRunner::group('Player accounts — Whoami diagnostics');
+
+$anon = $call2('Whoami', [], 'GET');
+TestRunner::equals('whoami is public', 0, $anon['code']);
+TestRunner::ok('whoami reports a missing token', $anon['data']['tokenReceived'] === false);
+TestRunner::ok('whoami hints at the fix', str_contains($anon['data']['hint'], 'Login'));
+
+$withToken = $call2('Whoami', [], 'GET', ['HTTP_AUTHORIZATION' => 'Bearer ' . $aliasToken]);
+TestRunner::ok('whoami confirms a valid token', $withToken['data']['valid'] === true);
+TestRunner::equals('whoami reports the user', $aliasLogin['data']['userId'], $withToken['data']['userId']);
+TestRunner::equals('whoami lists the source', ['Authorization'], $withToken['data']['tokenSources']);
+
+$junk = $call2('Whoami', [], 'GET', ['HTTP_AUTHORIZATION' => 'Bearer null']);
+TestRunner::ok('whoami ignores a null token', $junk['data']['tokenReceived'] === false);
+
+$bad = $call2('Whoami', [], 'GET', ['HTTP_AUTHORIZATION' => 'Bearer aaa.bbb.ccc']);
+TestRunner::ok('whoami explains a rejected token', $bad['data']['valid'] === false
+    && str_contains($bad['data']['hint'], 'rejected'));

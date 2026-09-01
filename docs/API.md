@@ -72,6 +72,11 @@ curl -X POST "https://api.example.com/api/Lottery?action=Login" \
   "code": 0, "msg": "success", "msgCode": "SUCCESS", "serviceTime": 1788000000123 }
 ```
 
+The same token is repeated as `accessToken`, `userToken` and `jwt`, and the id
+as `uid`/`id`, so most stock front-ends find it without changes. Credentials are
+accepted under the usual aliases too — `mobile|phone|username|account` and
+`password|pwd|passWord|loginPwd`.
+
 Store `data.token` (e.g. `localStorage.setItem('ar_token', token)`) and send it on
 every authenticated call. Passwords are bcrypt hashed; login answers with the
 same message for "unknown mobile" and "wrong password" so accounts cannot be
@@ -82,6 +87,27 @@ enumerated.
 > protected ones answer `401 AUTH_REQUIRED` instead of failing oddly.
 
 ### Using the token
+
+The token is read from any of these (first match wins):
+
+```
+Authorization: Bearer <jwt>      ← preferred
+Authorization: <jwt>
+Token / X-Token / X-Access-Token / Auth / X-Auth-Token: <jwt>
+?token= / ?access_token= / ?ar_token=
+```
+
+### Debugging a front-end: `GET ?action=Whoami` *(public)*
+
+```json
+{ "data": { "tokenReceived": true, "tokenSources": ["Authorization"],
+            "tokenPreview": "eyJhbGciOi…", "valid": true, "userId": 1001,
+            "expiresAt": "2026-09-02 06:45:17",
+            "hint": "Token is valid — authenticated endpoints will work." } }
+```
+
+If a call 401s, hit `Whoami` with the exact same headers: it says whether a
+token arrived, where it came from, and why it was rejected.
 
 Protected endpoints require a **HS256 JWT** in the `Authorization` header:
 

@@ -60,12 +60,25 @@ class LotteryController
      |  Player accounts
      * ================================================================ */
 
+    /**
+     * Field names differ between front-ends, so both endpoints accept the
+     * usual aliases: mobile | phone | username | account | userName …
+     * and password | pwd | passWord | loginPwd …
+     */
+    private const MOBILE_KEYS = [
+        'mobile', 'phone', 'phoneNumber', 'phonenumber', 'mobileNumber',
+        'username', 'userName', 'user_name', 'account', 'loginName', 'tel',
+    ];
+    private const PASSWORD_KEYS = [
+        'password', 'pwd', 'passWord', 'pass', 'loginPwd', 'login_pwd', 'userPassword',
+    ];
+
     /** POST ?action=Register  {mobile, password, nickname?} */
     public function register(): array
     {
         return $this->app->players()->register(
-            Validator::requireString($this->input, 'mobile', 20),
-            Validator::requireString($this->input, 'password', 64),
+            $this->pick(self::MOBILE_KEYS, 'mobile', 20),
+            $this->pick(self::PASSWORD_KEYS, 'password', 64),
             Validator::optionalString($this->input, 'nickname', '', 64)
         );
     }
@@ -74,8 +87,22 @@ class LotteryController
     public function login(): array
     {
         return $this->app->players()->login(
-            Validator::requireString($this->input, 'mobile', 20),
-            Validator::requireString($this->input, 'password', 64)
+            $this->pick(self::MOBILE_KEYS, 'mobile', 20),
+            $this->pick(self::PASSWORD_KEYS, 'password', 64)
+        );
+    }
+
+    /** First non-empty value among a set of aliases. */
+    private function pick(array $keys, string $label, int $max): string
+    {
+        foreach ($keys as $key) {
+            if (isset($this->input[$key]) && is_scalar($this->input[$key]) && trim((string) $this->input[$key]) !== '') {
+                return Validator::requireString($this->input, $key, $max);
+            }
+        }
+
+        throw ApiException::validation(
+            "Missing required parameter: {$label} (also accepted: " . implode(', ', array_slice($keys, 1, 4)) . ')'
         );
     }
 
@@ -99,6 +126,66 @@ class LotteryController
     public function refreshToken(array $user): array
     {
         return $this->app->players()->refresh((int) $user['id'], (string) $user['mobile']);
+    }
+
+    /**
+     * GET ?action=Whoami — public debug helper.
+     *
+     * Tells a front-end exactly what the server received: whether a token
+     * arrived, where it was found and whether it is valid. Nothing sensitive
+     * is echoed back.
+     */
+    public function whoami(): array
+    {
+        $auth  = $this->app->auth();
+        $token = $auth->extractToken($_SERVER, $this->input);
+
+        $sources = [];
+        foreach ([
+            'Authorization' => 'HTTP_AUTHORIZATION',
+            'Token'         => 'HTTP_TOKEN',
+            'X-Token'       => 'HTTP_X_TOKEN',
+            'X-Access-Token'=> 'HTTP_X_ACCESS_TOKEN',
+            'Auth'          => 'HTTP_AUTH',
+        ] as $label => $key) {
+            if (!empty($_SERVER[$key])) {
+                $sources[] = $label;
+            }
+        }
+        foreach (['token', 'access_token', 'ar_token'] as $key) {
+            if (!empty($this->input[$key])) {
+                $sources[] = 'query:' . $key;
+            }
+        }
+
+        $result = [
+            'tokenReceived' => $token !== '',
+            'tokenSources'  => $sources,
+            'tokenPreview'  => $token === '' ? null : substr($token, 0, 12) . '…',
+            'valid'         => false,
+            'userId'        => null,
+            'mobile'        => null,
+            'serverTime'    => Clock::dateTime(),
+            'hint'          => '',
+        ];
+
+        if ($token === '') {
+            $result['hint'] = 'No token found. POST action=Login first, then send Authorization: Bearer <token>.';
+            return $result;
+        }
+
+        try {
+            $claims           = $this->app->jwt()->verify($token);
+            $result['valid']  = true;
+            $result['userId'] = (int) $claims['id'];
+            $result['mobile'] = (string) $claims['mobile'];
+            $result['expiresAt'] = date('Y-m-d H:i:s', (int) $claims['exp']);
+            $result['hint']   = 'Token is valid — authenticated endpoints will work.';
+        } catch (ApiException $e) {
+            $result['hint'] = 'Token rejected: ' . $e->getMessage();
+        }
+
+        return $result;
     }
 
     /* ===================================================================
@@ -463,7 +550,7 @@ class LotteryController
             self::PUBLIC_WRITE_ACTIONS,
             [
                 'getgamelist', 'getgameinfo', 'getgameissue', 'gethistoryissuepage',
-                'gettrendstatistics', 'getfollowplanlist', 'health', 'logout',
+                'gettrendstatistics', 'getfollowplanlist', 'health', 'logout', 'whoami',
             ]
         ), true);
     }
