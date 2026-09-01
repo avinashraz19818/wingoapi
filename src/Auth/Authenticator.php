@@ -20,6 +20,7 @@ class Authenticator
     private Jwt $jwt;
     private WalletService $wallet;
     private ?array $user = null;
+    private string $userToken = '';
 
     public function __construct(Connection $db, Jwt $jwt, WalletService $wallet)
     {
@@ -31,17 +32,22 @@ class Authenticator
     /** @return array{id:int,mobile:string} */
     public function requireUser(array $server = null): array
     {
-        if ($this->user !== null) {
+        $token = $this->extractToken($server ?? $_SERVER);
+
+        // Memoised per token: the same request may resolve the caller several
+        // times, but a different (or missing) token must be re-evaluated.
+        if ($this->user !== null && $token !== '' && $token === $this->userToken) {
             return $this->user;
         }
 
-        $token = $this->extractToken($server ?? $_SERVER);
         if ($token === '') {
             throw ApiException::auth('Authorization header with a Bearer token is required');
         }
 
         $claims = $this->jwt->verify($token);
         $user   = $this->resolveUser($claims['id'], $claims['mobile']);
+
+        $this->userToken = $token;
 
         return $this->user = $user;
     }
@@ -71,11 +77,20 @@ class Authenticator
             }
         }
 
+        $token = '';
         if (preg_match('/Bearer\s+(\S+)/i', (string) $header, $m)) {
-            return $m[1];
+            $token = $m[1];
+        } else {
+            $token = trim((string) $header);
         }
 
-        return trim((string) $header);
+        // Front-ends commonly send the literal string "null" or "undefined"
+        // before the user has logged in — treat those as "no token at all".
+        if (in_array(strtolower($token), ['null', 'undefined', 'nil', 'false', '0'], true)) {
+            return '';
+        }
+
+        return $token;
     }
 
     /** Users are provisioned on first authenticated call. */

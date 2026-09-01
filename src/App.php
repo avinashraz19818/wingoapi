@@ -8,6 +8,7 @@ use Lottery\Admin\OverrideService;
 use Lottery\Auth\AdminAuth;
 use Lottery\Auth\Authenticator;
 use Lottery\Auth\Jwt;
+use Lottery\Auth\PlayerAuth;
 use Lottery\Auth\Signature;
 use Lottery\Betting\BetService;
 use Lottery\Database\Connection;
@@ -228,6 +229,17 @@ class App
         return $this->singleton(Signature::class, fn() => new Signature(
             (string) $this->config['auth']['signature_secret'],
             (int) $this->config['auth']['signature_ttl']
+        ));
+    }
+
+    public function players(): PlayerAuth
+    {
+        return $this->singleton(PlayerAuth::class, fn() => new PlayerAuth(
+            $this->db(),
+            $this->jwt(),
+            $this->wallet(),
+            $this->vip(),
+            (float) $this->config('auth.signup_bonus', 0)
         ));
     }
 

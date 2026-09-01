@@ -44,7 +44,7 @@ class AdminService
 
     public function dashboard(int $days = 7): array
     {
-        $todayStart = date('Y-m-d 00:00:00');
+        $todayStart = date('Y-m-d 00:00:00', Clock::now());
         $since      = date('Y-m-d 00:00:00', Clock::now() - (max(1, $days) - 1) * 86400);
 
         $today = $this->db->fetch(
@@ -492,7 +492,7 @@ class AdminService
         ];
     }
 
-    public function createUser(string $mobile, string $nickname, float $balance, string $actor): array
+    public function createUser(string $mobile, string $nickname, float $balance, string $actor, string $password = ''): array
     {
         Validator::mobile($mobile);
 
@@ -514,13 +514,36 @@ class AdminService
         }
 
         $this->app->wallet()->ensureWallet($userId);
+        if ($password !== '') {
+            $this->app->players()->setPassword($userId, $password);
+        }
         if ($balance > 0) {
             $this->adjustWallet($userId, $balance, 'credit', 'initial balance', $actor);
         }
 
-        $this->audit($actor, 'user.create', (string) $userId, ['mobile' => $mobile, 'balance' => $balance]);
+        $this->audit($actor, 'user.create', (string) $userId, [
+            'mobile' => $mobile, 'balance' => $balance, 'password' => $password !== '',
+        ]);
 
-        return ['userId' => $userId, 'mobile' => $mobile, 'token' => $this->app->jwt()->issue($userId, $mobile)];
+        return [
+            'userId'      => $userId,
+            'mobile'      => $mobile,
+            'canLogin'    => $password !== '',
+            'token'       => $this->app->jwt()->issue($userId, $mobile),
+        ];
+    }
+
+    /** Reset a player's password (support desk / onboarding). */
+    public function setUserPassword(int $userId, string $password, string $actor): array
+    {
+        if ($this->db->fetch('SELECT id FROM ' . Tables::USERS . ' WHERE id = ?', [$userId]) === null) {
+            throw ApiException::notFound('User not found');
+        }
+
+        $this->app->players()->setPassword($userId, $password);
+        $this->audit($actor, 'user.password', (string) $userId, []);
+
+        return ['userId' => $userId, 'passwordSet' => true];
     }
 
     public function adjustWallet(int $userId, float $amount, string $direction, string $remark, string $actor): array

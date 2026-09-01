@@ -218,6 +218,8 @@ return [
         'signature_secret'  => Env::get('SIGNATURE_SECRET', 'change-me-signature-secret'),
         'require_signature' => Env::bool('REQUIRE_SIGNATURE', false),
         'signature_ttl'     => (int) Env::get('SIGNATURE_TTL', '300'),
+        // Credited once when a player registers (0 = off).
+        'signup_bonus'      => Env::float('SIGNUP_BONUS', 0.0),
     ],
 
     /* ------------------------------------------------------------- security */

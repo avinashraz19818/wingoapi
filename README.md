@@ -23,6 +23,7 @@ Every response uses one envelope: `{data, code, msg, msgCode, serviceTime}`.
 | **Wallet** | Locked balance mutations with an immutable ledger; every entry has a unique `entry_key` so retries and cron overlaps can never double-spend or double-pay. |
 | **Settlement** | Auto-settles each round: evaluates every bet, updates `won/lost`, credits net payout, records a per-issue settlement summary. |
 | **VIP** | 1 EXP per ₹1 staked; levels 0/3K/30K/400K/4M/20M; one-time backfill of historical bets. |
+| **Player accounts** | `Register` / `Login` / `GetUserInfo` / `ChangePassword` / `RefreshToken` with bcrypt passwords — the front-end gets a JWT it can store. |
 | **Auth** | HS256 JWT (`id`, `mobile`, `exp`) via `Authorization: Bearer`; optional MD5-of-sorted-params request signature for write endpoints; separate admin token. |
 | **Admin overrides** | Per-game/per-issue forced results, plus the legacy one-shot "next round" mode. Consumed and cleared automatically. |
 | **Copy trading** | Curated plans (BigSmall, Color, K3 Big, 5D A-Big, TRX Green …); subscribers get one auto-bet per round with round budgets and duplicate protection. |
@@ -71,7 +72,7 @@ php cron/worker.php --loop      # daemon (systemd)
 php tests/run.php
 ```
 
-498 assertions covering issue numbering, all five rule engines, the HMAC draw
+556 assertions covering issue numbering, all five rule engines, the HMAC draw
 generator, provider parsing, overrides, wallet/ledger invariants, stake maths and
 limits, idempotency, settlement payouts and tax, VIP levels and backfill, copy
 trading, trend statistics, JWT/signature security, the full API surface and the

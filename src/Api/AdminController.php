@@ -27,6 +27,7 @@ class AdminController
         'createuser', 'setuserstatus', 'saveplan', 'deleteplan', 'stopfollow',
         'backfillvip', 'runworkerpass',
         'savedomain', 'deletedomain', 'rotatedomainkey', 'setdomainstatus',
+        'setuserpassword',
     ];
 
     /** Actions callable without an admin session. */
@@ -222,6 +223,16 @@ class AdminController
             Validator::requireString($this->input, 'mobile', 20),
             Validator::optionalString($this->input, 'nickname', '', 64),
             (float) Validator::optionalString($this->input, 'balance', '0', 20),
+            $this->actor,
+            Validator::optionalString($this->input, 'password', '', 64)
+        );
+    }
+
+    public function setUserPassword(): array
+    {
+        return $this->admin->setUserPassword(
+            Validator::int($this->input, 'userId', 0, 1, PHP_INT_MAX),
+            Validator::requireString($this->input, 'password', 64),
             $this->actor
         );
     }
@@ -392,6 +403,7 @@ class AdminController
             'bets', 'users', 'user', 'createuser', 'adjustwallet', 'setuserstatus',
             'ledger', 'plans', 'saveplan', 'deleteplan', 'follows', 'stopfollow',
             'vip', 'backfillvip', 'auditlog',
+            'setuserpassword',
             'domains', 'savedomain', 'setdomainstatus', 'rotatedomainkey',
             'deletedomain', 'domainusage', 'feedinfo',
         ];
@@ -418,6 +430,7 @@ class AdminController
             case 'createuser':     return $this->createUser();
             case 'adjustwallet':   return $this->adjustWallet();
             case 'setuserstatus':  return $this->setUserStatus();
+            case 'setuserpassword':return $this->setUserPassword();
             case 'ledger':         return $this->ledger();
             case 'plans':          return $this->plans();
             case 'saveplan':       return $this->savePlan();

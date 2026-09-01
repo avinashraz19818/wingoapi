@@ -54,6 +54,23 @@ $app = App::boot();
  * The second format extracts the action from the URL path and sends it
  * through the same Lottery Kernel.
  */
+/*
+ * Legacy front-end compatibility.
+ *
+ *   /api/webapi/Login          -> /api/Lottery?action=Login
+ *   /api/webapi?action=Login   -> same
+ *
+ * Older WinGo clients were built against a /api/webapi/* base; pointing them at
+ * this host keeps them working without touching their code.
+ */
+if (preg_match('#^/api/webapi(?:/([^/]+))?$#i', $uri, $legacy)) {
+    if (!empty($legacy[1])) {
+        $_GET['action'] = urldecode($legacy[1]);
+    }
+    (new Kernel($app))->handle();
+    exit;
+}
+
 if (
     $uri === '' ||
     preg_match('#^/(api/)?lottery$#i', $uri) ||

@@ -25,9 +25,13 @@ class LotteryController
     /** @var array<string,mixed> merged query + body parameters */
     private array $input;
 
+    /** Public actions that still must be POSTed (they create state). */
+    public const PUBLIC_WRITE_ACTIONS = ['register', 'login'];
+
     /** Actions that mutate state: POST + JWT + (optional) request signature. */
     public const WRITE_ACTIONS = [
         'wingobet', 'gamebet', 'placebet',
+        'changepassword', 'refreshtoken',
         'addfollowrecord', 'stopfollowrecord',
         'setresultoverride', 'cancelresultoverride',
         'backfillvipexperience', 'settleissue',
@@ -35,6 +39,7 @@ class LotteryController
 
     /** Actions that require a valid Bearer token. */
     public const AUTH_ACTIONS = [
+        'getuserinfo', 'changepassword', 'refreshtoken',
         'wingobet', 'gamebet', 'placebet', 'getrecordpage', 'getbalance',
         'getwinlossresult', 'addfollowrecord', 'stopfollowrecord',
         'getmyfollowrecords', 'getvipinfo', 'backfillvipexperience', 'getwalletledger',
@@ -49,6 +54,51 @@ class LotteryController
     {
         $this->app   = $app;
         $this->input = $input;
+    }
+
+    /* ===================================================================
+     |  Player accounts
+     * ================================================================ */
+
+    /** POST ?action=Register  {mobile, password, nickname?} */
+    public function register(): array
+    {
+        return $this->app->players()->register(
+            Validator::requireString($this->input, 'mobile', 20),
+            Validator::requireString($this->input, 'password', 64),
+            Validator::optionalString($this->input, 'nickname', '', 64)
+        );
+    }
+
+    /** POST ?action=Login  {mobile, password} -> the token your front-end stores */
+    public function login(): array
+    {
+        return $this->app->players()->login(
+            Validator::requireString($this->input, 'mobile', 20),
+            Validator::requireString($this->input, 'password', 64)
+        );
+    }
+
+    /** GET ?action=GetUserInfo */
+    public function getUserInfo(array $user): array
+    {
+        return $this->app->players()->profile((int) $user['id']);
+    }
+
+    /** POST ?action=ChangePassword {oldPassword, newPassword} */
+    public function changePassword(array $user): array
+    {
+        return $this->app->players()->changePassword(
+            (int) $user['id'],
+            Validator::optionalString($this->input, 'oldPassword', '', 64),
+            Validator::requireString($this->input, 'newPassword', 64)
+        );
+    }
+
+    /** POST ?action=RefreshToken — new JWT before the old one expires. */
+    public function refreshToken(array $user): array
+    {
+        return $this->app->players()->refresh((int) $user['id'], (string) $user['mobile']);
     }
 
     /* ===================================================================
@@ -410,9 +460,10 @@ class LotteryController
             self::WRITE_ACTIONS,
             self::AUTH_ACTIONS,
             self::ADMIN_ACTIONS,
+            self::PUBLIC_WRITE_ACTIONS,
             [
                 'getgamelist', 'getgameinfo', 'getgameissue', 'gethistoryissuepage',
-                'gettrendstatistics', 'getfollowplanlist', 'health',
+                'gettrendstatistics', 'getfollowplanlist', 'health', 'logout',
             ]
         ), true);
     }

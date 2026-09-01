@@ -155,6 +155,10 @@ class Kernel
             $normalised,
             LotteryController::WRITE_ACTIONS,
             true
+        ) || in_array(
+            $normalised,
+            LotteryController::PUBLIC_WRITE_ACTIONS,
+            true
         );
 
         if (
@@ -199,6 +203,26 @@ class Kernel
         }
 
         switch ($normalised) {
+            /* player accounts */
+
+            case 'register':
+                return $controller->register();
+
+            case 'login':
+                return $controller->login();
+
+            case 'logout':
+                return ['loggedOut' => true];
+
+            case 'getuserinfo':
+                return $controller->getUserInfo($user);
+
+            case 'changepassword':
+                return $controller->changePassword($user);
+
+            case 'refreshtoken':
+                return $controller->refreshToken($user);
+
             /* public */
 
             case 'getgamelist':

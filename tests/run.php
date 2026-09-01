@@ -144,6 +144,7 @@ $files = [
     __DIR__ . '/FollowTest.php',
     __DIR__ . '/TrendTest.php',
     __DIR__ . '/AuthTest.php',
+    __DIR__ . '/PlayerAuthTest.php',
     __DIR__ . '/ApiTest.php',
     __DIR__ . '/AdminTest.php',
     __DIR__ . '/FeedTest.php',

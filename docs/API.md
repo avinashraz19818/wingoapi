@@ -1,7 +1,15 @@
 # Lottery API reference
 
 Base URL: `https://api.example.com/api/Lottery`
-Every endpoint accepts the action either as `?action=Name` (query) or in a JSON body.
+
+The action can be given three ways — all equivalent:
+
+```
+GET  /api/Lottery?action=GetGameList          query string
+GET  /api/Lottery/GetGameList                 path style
+GET  /api/webapi/GetGameList                  legacy front-end base
+POST /api/Lottery            {"action":"Login", …}   JSON body
+```
 
 ## Response envelope
 
@@ -40,6 +48,40 @@ Every response — success or failure — uses the same shape:
 | 1500 | `SERVER_ERROR` | 500 | Unhandled failure (details only when `APP_DEBUG=true`) |
 
 ## Authentication
+
+### Get a token (what your front-end calls first)
+
+| Action | Method | Body | Returns |
+|---|---|---|---|
+| `Register` | POST | `mobile`, `password`, `nickname?` | `token`, `userId`, `balance`, `vipLevel` |
+| `Login` | POST | `mobile`, `password` | same |
+| `GetUserInfo` | GET | — (Bearer) | profile + balance + VIP |
+| `ChangePassword` | POST | `oldPassword`, `newPassword` (Bearer) | `changed` |
+| `RefreshToken` | POST | — (Bearer) | a fresh token |
+| `Logout` | POST | — | `loggedOut` (drop the token client-side) |
+
+```bash
+curl -X POST "https://api.example.com/api/Lottery?action=Login" \
+  -H 'Content-Type: application/json' \
+  -d '{"mobile":"9876543210","password":"secret123"}'
+```
+
+```json
+{ "data": { "token": "eyJhbGciOi…", "tokenType": "Bearer", "expiresIn": 86400,
+            "userId": 1001, "mobile": "98******10", "balance": "0.00", "vipLevel": 0 },
+  "code": 0, "msg": "success", "msgCode": "SUCCESS", "serviceTime": 1788000000123 }
+```
+
+Store `data.token` (e.g. `localStorage.setItem('ar_token', token)`) and send it on
+every authenticated call. Passwords are bcrypt hashed; login answers with the
+same message for "unknown mobile" and "wrong password" so accounts cannot be
+enumerated.
+
+> Sending `Authorization: Bearer null` / `Bearer undefined` (common before the
+> user logs in) is treated as *no token*: public endpoints keep working and
+> protected ones answer `401 AUTH_REQUIRED` instead of failing oddly.
+
+### Using the token
 
 Protected endpoints require a **HS256 JWT** in the `Authorization` header:
 
