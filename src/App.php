@@ -163,7 +163,8 @@ class App
             $this->fetcher(),
             $this->localDraw(),
             $this->overrides(),
-            (bool) $this->config['force_remote_draw']
+            (bool) $this->config['force_remote_draw'],
+            (int) ($this->config['draw_fallback_delay'] ?? 25)
         ));
     }
 

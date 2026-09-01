@@ -35,6 +35,7 @@ class DrawService
     private LocalDrawGenerator $local;
     private OverrideService $overrides;
     private bool $forceRemote;
+    private int $fallbackDelay;
 
     public function __construct(
         Connection $db,
@@ -43,8 +44,10 @@ class DrawService
         DrawFetcher $fetcher,
         LocalDrawGenerator $local,
         OverrideService $overrides,
-        bool $forceRemote
+        bool $forceRemote,
+        int $fallbackDelay = 25
     ) {
+        $this->fallbackDelay = max(0, $fallbackDelay);
         $this->db          = $db;
         $this->rules       = $rules;
         $this->scheduler   = $scheduler;
@@ -83,7 +86,7 @@ class DrawService
             return $existing;
         }
 
-        $resolved = $this->resolve($game, $issue->issueNumber);
+        $resolved = $this->resolve($game, $issue->issueNumber, $issue->endTs, $now);
         if ($resolved === null) {
             return null;
         }
@@ -110,8 +113,9 @@ class DrawService
     /**
      * @return array{result:array,source:string,hash:?string}|null
      */
-    private function resolve(GameDefinition $game, string $issueNumber): ?array
+    private function resolve(GameDefinition $game, string $issueNumber, int $endTs = 0, ?int $now = null): ?array
     {
+        $now = $now ?? Clock::now();
         $override = $this->overrides->pendingFor($game, $issueNumber);
         if ($override !== null) {
             try {
@@ -135,6 +139,15 @@ class DrawService
             Log::warning('remote draw unavailable and force_remote_draw is enabled', [
                 'game' => $game->code, 'issue' => $issueNumber,
             ]);
+            return null;
+        }
+
+        // The provider publishes a round a few seconds after it closes. Drawing
+        // locally the instant the timer hits zero would mean our numbers never
+        // match theirs, so hold off briefly for games they actually serve.
+        if ($endTs > 0
+            && $this->fetcher->servesGame($game)
+            && ($now - $endTs) < $this->fallbackDelay) {
             return null;
         }
 

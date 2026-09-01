@@ -98,6 +98,9 @@ function makeTestApp(array $overrides = []): App
     $config['log']['path']              = '';
     $config['draw_base_url']            = 'https://draw.invalid';
     $config['force_remote_draw']        = false;
+    // Tests want deterministic, immediate local draws; the production default
+    // waits for the provider first (covered by its own test below).
+    $config['draw_fallback_delay']      = 0;
     $config['draw_secret']              = 'test-draw-secret';
     $config['auth']['jwt_secret']       = 'test-jwt-secret';
     $config['auth']['signature_secret'] = 'test-signature-secret';

@@ -180,6 +180,10 @@ return [
     // Seconds to skip a provider endpoint after it fails, so an outage cannot
     // flood the log or slow the worker down.
     'draw_failure_cooldown' => (int) Env::get('DRAW_FAILURE_COOLDOWN', '60'),
+    // Seconds to wait for the provider to publish a freshly finished round
+    // before falling back to the local generator. Too small and every round is
+    // drawn locally a second after it ends; too large and payouts are delayed.
+    'draw_fallback_delay'   => (int) Env::get('DRAW_FALLBACK_DELAY', '25'),
     // true  -> a round stays unresolved until the provider answers
     // false -> fall back to the local HMAC-SHA256 deterministic generator
     'force_remote_draw' => Env::bool('FORCE_REMOTE_DRAW', false),

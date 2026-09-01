@@ -224,3 +224,95 @@ $backoff->fetchIssue($gameA, '20260831100010003');
 TestRunner::equals('endpoint is retried after the cooldown expires', 2, $counter->calls);
 
 Clock::unfreeze();
+
+TestRunner::group('Draws — give the provider a head start');
+
+// A provider that only publishes a round 30s after it closes.
+final class SlowProviderStub extends \Lottery\Support\Http
+{
+    public array $rows = [];
+    public int $publishAt = 0;
+    public function __construct() { parent::__construct(5); }
+    public function fetchArray(string $url, array $headers = []): ?array
+    {
+        if (Clock::now() < $this->publishAt) {
+            return ['list' => []];
+        }
+        return ['list' => $this->rows];
+    }
+}
+
+Clock::freeze(strtotime('2026-09-01 12:00:30'));
+
+$delayApp   = makeTestApp(['draw_base_url' => 'https://draw.example.net']);
+$delayGame  = $delayApp->registry()->get('WinGo_1M');
+$delayIssue = $delayApp->scheduler()->previous($delayGame);   // ended at 12:00:00
+
+$slow            = new SlowProviderStub();
+$slow->publishAt = strtotime('2026-09-01 12:00:20');
+$slow->rows      = [['issueNumber' => $delayIssue->issueNumber, 'number' => '6']];
+
+$slowFetcher = new \Lottery\Draw\DrawFetcher(
+    $slow, new RulesFactory(), 'https://draw.example.net',
+    ['{base}/{game}/{interval}.json'], true, 0, []
+);
+$slowDraws = new \Lottery\Draw\DrawService(
+    $delayApp->db(), new RulesFactory(), $delayApp->scheduler(), $slowFetcher,
+    new LocalDrawGenerator('s', new RulesFactory()), $delayApp->overrides(), false, 25
+);
+
+// 5 seconds after the round closed: the provider has nothing yet.
+Clock::freeze(strtotime('2026-09-01 12:00:05'));
+$slowFetcher->flush();
+TestRunner::ok('no local draw while the provider may still publish',
+    $slowDraws->ensureResult($delayGame, $delayIssue) === null);
+
+// 25 seconds in, the provider has published — we mirror it.
+Clock::freeze(strtotime('2026-09-01 12:00:25'));
+$slowFetcher->flush();
+$mirrored = $slowDraws->ensureResult($delayGame, $delayIssue);
+TestRunner::ok('the provider result is used once available', $mirrored !== null);
+TestRunner::equals('mirrored source', 'remote', $mirrored['source']);
+TestRunner::equals('mirrored number', 6, (int) $mirrored['primary_number']);
+
+// A provider that never publishes: local takes over after the grace period.
+$deadApp   = makeTestApp(['draw_base_url' => 'https://draw.example.net']);
+$deadGame  = $deadApp->registry()->get('WinGo_1M');
+$deadIssue = $deadApp->scheduler()->previous($deadGame);
+
+$dead        = new SlowProviderStub();
+$dead->publishAt = strtotime('2026-09-01 23:59:59');   // never, in practice
+$deadFetcher = new \Lottery\Draw\DrawFetcher(
+    $dead, new RulesFactory(), 'https://draw.example.net',
+    ['{base}/{game}/{interval}.json'], true, 0, []
+);
+$deadDraws = new \Lottery\Draw\DrawService(
+    $deadApp->db(), new RulesFactory(), $deadApp->scheduler(), $deadFetcher,
+    new LocalDrawGenerator('s', new RulesFactory()), $deadApp->overrides(), false, 25
+);
+
+Clock::freeze(strtotime('2026-09-01 12:00:10'));
+$deadFetcher->flush();
+TestRunner::ok('still waiting inside the grace period',
+    $deadDraws->ensureResult($deadGame, $deadIssue) === null);
+
+Clock::freeze(strtotime('2026-09-01 12:00:40'));
+$deadFetcher->flush();
+$fallback = $deadDraws->ensureResult($deadGame, $deadIssue);
+TestRunner::ok('local generator takes over afterwards', $fallback !== null);
+TestRunner::equals('fallback source', 'local', $fallback['source']);
+
+// Games the provider does not serve are drawn locally straight away.
+$motoApp = makeTestApp([
+    'draw_base_url'           => 'https://draw.example.net',
+    'draw_supported_families' => ['WinGo'],
+    'draw_fallback_delay'     => 25,
+]);
+Clock::freeze(strtotime('2026-09-01 12:00:05'));
+$moto      = $motoApp->registry()->get('MotoRace_1M');
+$motoIssue = $motoApp->scheduler()->previous($moto);
+$motoDrawn = $motoApp->draws()->ensureResult($moto, $motoIssue);
+TestRunner::ok('an unsupported game does not wait', $motoDrawn !== null);
+TestRunner::equals('and is drawn locally', 'local', $motoDrawn['source']);
+
+Clock::unfreeze();
