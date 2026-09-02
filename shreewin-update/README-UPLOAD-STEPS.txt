@@ -81,3 +81,8 @@ GitHub raw links (individual files):
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/saas_lottery-config_live_v4.php
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/draw-live-v4-index.php
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/assets-css-shreewin-wheel500-hotfix.css
+
+v4 CHANGE: Win/Lose popup (winning-loss popup) fix — GetWinLossResult ab
+client ke timer-end par status null nahi dega: agar us period ka result DB me
+cached hai to server pending bet ko usi request me settle karke seedha
+won/lost + amount return karega. Popup ab clock-skew se unaffected aayega.

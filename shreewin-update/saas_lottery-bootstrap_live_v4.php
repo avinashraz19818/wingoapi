@@ -2147,6 +2147,36 @@ function sl_win_loss($userId, $input)
     $stmt->bind_result($total, $pending, $won, $winAmount);
     $stmt->fetch();
     $stmt->close();
+    // The client fires this once when its countdown hits zero and drops the
+    // bet from its popup queue on a null answer, so the answer must never
+    // depend on the settlement gate racing the client's clock. The client is
+    // only allowed to ask after its own timer ended, and the stored result of
+    // that issue is the final upstream outcome (cached a full period ago), so
+    // settling now is safe: it only aligns the payout popup with the on-screen
+    // countdown instead of delaying it by network/clock skew.
+    if ((int) $total > 0 && (int) $pending > 0 && $gameCode !== '') {
+        $res = $conn->prepare('SELECT premium FROM saas_lottery_results WHERE game_code=? AND issue_number=? LIMIT 1');
+        $res->bind_param('ss', $gameCode, $issue);
+        $res->execute();
+        $res->bind_result($storedPremium);
+        $hasResult = $res->fetch();
+        $res->close();
+        if ($hasResult && $storedPremium !== null) {
+            $item = sl_normalize_result_item($gameCode, array(
+                'issueNumber' => (string) $issue,
+                'premium' => (string) $storedPremium,
+            ));
+            if ($item) {
+                sl_settle_issue($gameCode, (string) $issue, $item);
+                $again = $conn->prepare("SELECT COUNT(*),SUM(status='pending'),SUM(status='won'),COALESCE(SUM(payout),0) FROM saas_lottery_bets WHERE user_id=? AND issue_number=?");
+                $again->bind_param('is', $userId, $issue);
+                $again->execute();
+                $again->bind_result($total, $pending, $won, $winAmount);
+                $again->fetch();
+                $again->close();
+            }
+        }
+    }
     if ((int) $total === 0 || (int) $pending > 0) {
         return array('status'=>null,'winAmount'=>0);
     }
