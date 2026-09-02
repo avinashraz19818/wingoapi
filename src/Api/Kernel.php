@@ -250,6 +250,7 @@ class Kernel
                 return $controller->getGameIssue();
 
             case 'gethistoryissuepage':
+            case 'getnoaverageemerdlist':
                 return $controller->getHistoryIssuePage();
 
             case 'gettrendstatistics':

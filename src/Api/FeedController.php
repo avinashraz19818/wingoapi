@@ -6,6 +6,7 @@ namespace Lottery\Api;
 
 use Lottery\App;
 use Lottery\Games\GameDefinition;
+use Lottery\Games\IssueNumber;
 use Lottery\Support\ApiException;
 use Lottery\Support\Clock;
 use Lottery\Support\Validator;
@@ -72,10 +73,7 @@ class FeedController
         // Make sure everything that has finished is drawn before we serve it.
         $this->app->settlement()->settleDue($game, min(20, $pageSize + 5));
 
-        $activeIssue = (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '');
-        if ($activeIssue === '') {
-            $activeIssue = (string) $this->app->scheduler()->current($game)->issueNumber;
-        }
+        $activeIssue = $this->effectiveActiveIssue($game);
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -137,6 +135,24 @@ class FeedController
             'current'        => $shape($current),
             'next'           => $shape($next),
         ];
+    }
+
+    /**
+     * Active issue upper-bound for history/trend queries.
+     *
+     * Bumps a stale/lagging client-supplied activeIssue up to the real open
+     * round so the round that just finished is always included.
+     */
+    private function effectiveActiveIssue(GameDefinition $game): string
+    {
+        $current = (string) $this->app->scheduler()->current($game)->issueNumber;
+        $active  = trim((string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? ''));
+
+        if ($active === '' || !IssueNumber::isValid($active) || !IssueNumber::belongsTo($active, $game)) {
+            return $current;
+        }
+
+        return strcmp($active, $current) < 0 ? $current : $active;
     }
 
     /** One specific round. */

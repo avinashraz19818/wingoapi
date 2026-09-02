@@ -78,7 +78,11 @@ if (preg_match('#^/api/webapi(?:/([^/]+))?$#i', $uri, $legacy)) {
     if (!empty($legacy[1])) {
         $_GET['action'] = urldecode($legacy[1]);
     }
-    (new Kernel($app))->handle();
+    // 91Club / in999 style front-ends expect the AR-compatible dialect:
+    // GetGameIssue, GetNoaverageEmerdList, WinGoBet and so on, usually with a
+    // numeric typeId. Route them through CompatKernel rather than the generic
+    // engine kernel so those clients keep working unchanged.
+    (new CompatKernel($app))->handle();
     exit;
 }
 

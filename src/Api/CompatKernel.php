@@ -91,7 +91,8 @@ class CompatKernel
         // the site's own token is introspected against its own API.
         $needsUser = in_array($action, [
             'getbalance', 'getrecordpage', 'getwinlossresult', 'getuserinfo',
-            'getmybetrecord', 'getbetrecord',
+            'getmybetrecord', 'getbetrecord', 'getmyemerdlist', 'getmyemerglist',
+            'getuserbetrecord',
         ], true) || str_ends_with($action, 'bet');
 
         $user = $this->app->auth()->optionalUser(null, $input);
@@ -126,7 +127,10 @@ class CompatKernel
             case 'getuserinfo':          return $controller->userInfo();
             case 'getrecordpage':
             case 'getmybetrecord':
-            case 'getbetrecord':         return $controller->records($game);
+            case 'getbetrecord':
+            case 'getmyemerdlist':
+            case 'getmyemerglist':
+            case 'getuserbetrecord':     return $controller->records($game);
             case 'getwinlossresult':     return $controller->winLoss($this->requireGame($game));
             case 'getbetlimit':          return $controller->betLimit();
             case 'getgameintroduce':     return $controller->introduce();
@@ -192,12 +196,33 @@ class CompatKernel
 
     private function game(array $input): ?\Lottery\Games\GameDefinition
     {
-        $code = trim((string) ($input['gameCode'] ?? $input['typeId'] ?? ''));
+        $code = trim((string) ($input['gameCode'] ?? ''));
+        if ($code === '') {
+            $typeId = trim((string) ($input['typeId'] ?? $input['typeid'] ?? ''));
+            $code = $this->typeIdToGameCode($typeId);
+        }
+
         if ($code === '') {
             return null;
         }
 
         return $this->app->registry()->find($code);
+    }
+
+    /** Numeric typeId used by 91Club / in999 style front-ends -> game code. */
+    private function typeIdToGameCode(string $typeId): string
+    {
+        $map = [
+            '0'  => 'WinGo_30S',
+            '1'  => 'WinGo_1M',
+            '2'  => 'WinGo_3M',
+            '3'  => 'WinGo_5M',
+            '4'  => 'WinGo_30S',
+            '10' => 'WinGo_10M',
+            '30' => 'WinGo_30S',
+        ];
+
+        return $map[$typeId] ?? '';
     }
 
     private function requireGame(?\Lottery\Games\GameDefinition $game): \Lottery\Games\GameDefinition

@@ -97,7 +97,21 @@ switch (strtolower($action)) {
     case 'gethistory':
     case 'history':
         $issue = $syncService->getCurrentIssue($gameCode);
-        $activeIssue = $issue['issue_number'] ?? null;
+
+        // Resolve/sync the just-finished round before serving history so a
+        // front-end that polls at 00:00 does not have to wait for the worker
+        // (or manually refresh). The worker will keep it idempotent later.
+        try {
+            $syncService->syncGame($gameCode);
+            $issue = $syncService->getCurrentIssue($gameCode);
+        } catch (Throwable $e) {}
+
+        // Do not filter with getCurrentIssue()->issue_number: this endpoint's
+        // issue_number is deliberately lagged one period behind the real open
+        // round. Using it as activeIssue would exclude the round that just
+        // finished, so the front-end keeps showing an old history until manual
+        // refresh. Use the actual open round (next_issue_number) as upper bound.
+        $activeIssue = $issue['next_issue_number'] ?? null;
         $history = $syncService->getHistory($gameCode, $pageSize, $activeIssue);
         $list = [];
         foreach ($history as $row) {
