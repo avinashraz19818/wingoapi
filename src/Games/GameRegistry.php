@@ -1,0 +1,183 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Lottery\Games;
+
+use Lottery\Support\ApiException;
+
+/**
+ * Builds the catalogue of games from config and answers lookups by code.
+ *
+ * Family codes are the 3-digit segment of the 17-digit issue number and must
+ * never change once a game has gone live.
+ */
+class GameRegistry
+{
+    public const FAMILY_CODES = [
+        'WinGo'    => '100',
+        'TrxWinGo' => '200',
+        'K3'       => '300',
+        'D5'       => '400',
+        'MotoRace' => '500',
+    ];
+
+    /** Client-friendly aliases accepted on input. */
+    public const FAMILY_ALIASES = [
+        '5d'        => 'D5',
+        'd5'        => 'D5',
+        'wingo'     => 'WinGo',
+        'trxwingo'  => 'TrxWinGo',
+        'trx'       => 'TrxWinGo',
+        'k3'        => 'K3',
+        'motorace'  => 'MotoRace',
+        'moto'      => 'MotoRace',
+    ];
+
+    private const FAMILY_LABELS = [
+        'WinGo'    => 'Win Go',
+        'TrxWinGo' => 'TRX Win Go',
+        'K3'       => 'K3 Lotre',
+        'D5'       => '5D Lotre',
+        'MotoRace' => 'Moto Race',
+    ];
+
+    /** @var array<string,GameDefinition> keyed by lowercase game code */
+    private array $games = [];
+    /** @var array<string,array{seconds:int,issue_code:string,label:string}> */
+    private array $intervals;
+
+    public function __construct(array $config)
+    {
+        $this->intervals = $config['intervals'] ?? [];
+        $lockMap         = $config['betting']['lock_seconds'] ?? [];
+        // Optional per-game 5-digit issue prefix (familyCode + intervalCode).
+        // Used to line our issue numbers up exactly with an upstream provider.
+        $prefixes        = $config['issue_prefixes'] ?? [];
+
+        foreach ($config['games'] ?? [] as $entry) {
+            $family   = (string) ($entry['lottery'] ?? '');
+            $interval = strtoupper((string) ($entry['interval'] ?? ''));
+
+            if (!isset(self::FAMILY_CODES[$family], $this->intervals[$interval])) {
+                continue;
+            }
+
+            $meta = $this->intervals[$interval];
+            $code = $family . '_' . $interval;
+
+            $familyCode   = self::FAMILY_CODES[$family];
+            $intervalCode = (string) $meta['issue_code'];
+
+            $prefix = (string) ($prefixes[$code] ?? '');
+            if (preg_match('/^\d{5}$/', $prefix)) {
+                $familyCode   = substr($prefix, 0, 3);
+                $intervalCode = substr($prefix, 3, 2);
+            }
+
+            $this->games[strtolower($code)] = new GameDefinition(
+                $code,
+                $family,
+                $familyCode,
+                $interval,
+                $intervalCode,
+                (int) $meta['seconds'],
+                (int) ($lockMap[$interval] ?? 5),
+                (int) ($entry['sort'] ?? 0),
+                (int) ($entry['state'] ?? 1),
+                (self::FAMILY_LABELS[$family] ?? $family) . ' ' . $meta['label']
+            );
+        }
+    }
+
+    /** @return array<int,GameDefinition> ordered by sort */
+    public function all(): array
+    {
+        $games = array_values($this->games);
+        usort($games, static fn(GameDefinition $a, GameDefinition $b) => $a->sort <=> $b->sort);
+        return $games;
+    }
+
+    /** @return array<string,array<int,GameDefinition>> family => games */
+    public function grouped(): array
+    {
+        $grouped = [];
+        foreach ($this->all() as $game) {
+            $grouped[$game->family][] = $game;
+        }
+        return $grouped;
+    }
+
+    public function find(string $gameCode): ?GameDefinition
+    {
+        $normalised = $this->normaliseCode($gameCode);
+        return $this->games[strtolower($normalised)] ?? null;
+    }
+
+    public function get(string $gameCode): GameDefinition
+    {
+        $game = $this->find($gameCode);
+        if ($game === null) {
+            throw ApiException::notFound("Unknown gameCode: {$gameCode}");
+        }
+        if ($game->state !== 1) {
+            throw ApiException::closed("Game {$game->code} is currently disabled");
+        }
+        return $game;
+    }
+
+    /**
+     * Interval spellings seen in the wild: 1Min, 1min, 1_Min, 30Sec, 30s …
+     */
+    public const INTERVAL_ALIASES = [
+        '30SEC'  => '30S',
+        '30SECS' => '30S',
+        '30S'    => '30S',
+        '1MIN'   => '1M',
+        '1MINUTE'=> '1M',
+        '3MIN'   => '3M',
+        '5MIN'   => '5M',
+        '10MIN'  => '10M',
+        '1M'     => '1M',
+        '3M'     => '3M',
+        '5M'     => '5M',
+        '10M'    => '10M',
+    ];
+
+    /**
+     * Accepts "5D_1M", "wingo_1m", "WinGo1M", "WinGo_1Min", "5D_1Min",
+     * "MotoRace_1Min" … and normalises to the canonical code.
+     */
+    public function normaliseCode(string $gameCode): string
+    {
+        $gameCode = trim($gameCode);
+        if ($gameCode === '') {
+            return '';
+        }
+        if (!str_contains($gameCode, '_')) {
+            if (preg_match('/^([A-Za-z]+?)(\d+\s*(?:S|SEC|SECS|M|MIN|MINUTE)S?)$/i', $gameCode, $m)) {
+                $gameCode = $m[1] . '_' . $m[2];
+            } else {
+                return $gameCode;
+            }
+        }
+
+        [$family, $interval] = explode('_', $gameCode, 2);
+        $family   = self::FAMILY_ALIASES[strtolower($family)] ?? $family;
+        $interval = strtoupper(str_replace([' ', '-', '_'], '', $interval));
+        $interval = self::INTERVAL_ALIASES[$interval] ?? $interval;
+
+        return $family . '_' . $interval;
+    }
+
+    /** @return array<string,array{seconds:int,issue_code:string,label:string}> */
+    public function intervals(): array
+    {
+        return $this->intervals;
+    }
+
+    public static function familyLabel(string $family): string
+    {
+        return self::FAMILY_LABELS[$family] ?? $family;
+    }
+}

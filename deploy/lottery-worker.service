@@ -1,0 +1,27 @@
+# /etc/systemd/system/lottery-worker.service
+#   systemctl enable --now lottery-worker
+[Unit]
+Description=Lottery draw, settlement and copy-trade worker
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lottery-api
+ExecStart=/usr/bin/php /var/www/lottery-api/cron/worker.php --loop --interval=2 --quiet
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/lottery-api/data /dev/shm
+
+[Install]
+WantedBy=multi-user.target
