@@ -1,48 +1,60 @@
-SHREEWIN - 1 PERIOD PICHE (RESULT LAG) UPDATE
-==============================================
+SHREEWIN - 1 PERIOD PICHE (RESULT LAG) UPDATE  v2
+==================================================
+v2 me fix: result TIMER END KARTE HI history me aayega (pehle server-clock
+boundary se bind tha, ab provider ke apne latest-closed signal se bhi fire
+hotа hai — dono me jo pehle). Reveal kabhi premature nahi hoga (safety clamp).
 
-Ye folder me 2 updated PHP files hain jo ShreeWin ke liye wingoapi jaisa
-"1 period piche" buffer laga deti hain (period number + result reveal
-upstream se 1 poora period late dikhte hain; countdown real-time rehta hai).
+FILES AUR UNKE CPANEL TARGET PATH (3 files):
+--------------------------------------------
+1) saas_lottery/bootstrap_live_v4.php   -> replace   (engine + lag + reveal gate)
+2) saas_lottery/config_live_v4.php      -> replace   (period_lag => 1)
+3) draw-live-v4/index.php               -> replace   (boundary-wait window widen:
+                                          timer ke aas-paas ki request hold ho
+                                          kar result ready hote hi deti hai)
 
-FILES AUR UNKE CPANEL TARGET PATH:
----------------------------------
-1) bootstrap_live_v4.php
-   -> upload at: public_html/saas_lottery/bootstrap_live_v4.php   (replace)
-
-2) config_live_v4.php
-   -> upload at: public_html/saas_lottery/config_live_v4.php       (replace)
-   -> isi me nayi line added hai: 'period_lag' => 1
-      (0 = wapas live mode, 1 = 1 period piche, 2 = 2 period piche)
+EXTRACT-READY ZIP:
+------------------
+shreewin-update.zip ke andar exactly wahi folder structure hai:
+  saas_lottery/bootstrap_live_v4.php
+  saas_lottery/config_live_v4.php
+  draw-live-v4/index.php
+Ise public_html me upload karo -> right-click -> Extract Now.
+Files khud sahi folders me overwrite ho jayengi.
+(cPanel Extract overwrite karta hai; isliye pehle backup zaroor le lena.)
 
 STEPS:
 ------
-1. cPanel -> File Manager -> public_html -> saas_lottery folder kholo.
-2. Purani dono files ka backup lo (right-click -> Copy, ya rename to .bak).
-   NOTE: agar server wali config_live_v4.php me draw_base_url ya games list
-   alag hai to mujhe bhej do, main sirf period_lag line add kar dunga.
-3. Is folder ki dono files upload karo -> Overwrite/Replace karo.
-4. Bas. DB change nahi, cron change nahi, frontend rebuild nahi.
-   Site refresh hote hi naya period system chalega.
+1. cPanel -> File Manager -> public_html jao.
+2. Backup: saas_lottery aur draw-live-v4 folders ka copy bana lo
+   (ya kam se kam in 3 files ka .bak).
+3. shreewin-update.zip upload karo -> public_html me hi Extract karo.
+4. Bas. DB nahi chhedna, cron nahi, frontend/assets untouched hain isliye
+   CSS/UI bilkul same rahega. Hard refresh (Ctrl+F5) karke test karo.
 
-VERIFY:
--------
-- WinGo 1M kholo: aapke site ka current period number upstream se 1 number
-  piche hona chahiye.
-- Result history me sabse latest row tab aayega jab aapka dikhaya hua period
-  close hoga (upstream usse 1 period pehle reveal kar chuka hota hai).
-- Test bet settle hona chahiye cycle ke end tak.
+VERIFY KARNE KA TICKET:
+-----------------------
+- Game kholo (WinGo 1M): on-screen period number = upstream se 1 piche. ✓
+- TIMER TEST (v2 ka main fix): jab countdown 0 ho, USI period ka result
+  TURANT history/list me top row ke roop me dikhna chahiye
+  (zyada se zyada ~2-5 sec, kyunki request boundary par hold hoti hai).
+- Result animation ke baad agli period ka number continue kare (no skips).
+- Trend page aur Records page bhi lagged history hi dikhayenge (consistent).
+- Test bet: bet accept hoga, period close hote hi settle (balance update).
 
-ZIP (ek saath download ke liye):
---------------------------------
-shreewin-update.zip me same dono files hain.
+CONTROL:
+--------
+config_live_v4.php me:
+  'period_lag' => 1  -> 1 period piche (current setting)
+  'period_lag' => 0  -> wapas live (reveal behaviour bhi purana)
+  'period_lag' => 2  -> 2 period piche (30s games ke liye option)
 
-GitHub direct download links (browser me khol ke Ctrl+S se save karo):
-  https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/bootstrap_live_v4.php
-  https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/config_live_v4.php
+ROLLBACK:
+---------
+saas_lottery_bak / draw-live-v4 wapas copy kar lo, ya in 3 files ko .bak se
+restore kar do. Koi DB change nahi hai to data safe rahega.
 
-EXTRACT-READY ZIP (recommended):
-  shreewin-update.zip ke andar saas_lottery/ folder hai.
-  Ise public_html me upload karo -> right-click -> Extract Now.
-  Dono files khud saas_lottery/ me jaake overwrite ho jayengi.
-  (cPanel Extract overwrite karta hai; isliye pehle backup zaroor le lena.)
+Direct download (GitHub raw links):
+  https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/shreewin-update.zip
+  https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/saas_lottery-bootstrap_live_v4.php
+  https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/saas_lottery-config_live_v4.php
+  https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/draw-live-v4-index.php
