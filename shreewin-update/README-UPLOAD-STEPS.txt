@@ -104,3 +104,11 @@ hai: betMultiples = [1,5,20,50,100] -> row dikhega X1 X5 X20 X50 X100
 file chhota hi rahega ~same, 500-fix wali line ab bhi andar hai).
 
 v8: user maanga X10 bhi -> final list [1,5,10,20,50,100] = X1 X5 X10 X20 X50 X100
+
+v9 (UI): 1) Bottom tab ka "Get ₹500" ab reference-jaisa — solid gold text,
+   dark-red outline, no white chip (hotfix css v5).
+   2) Add-to-Desktop pill me ✕ close button (hotfix js v5) — click par pill
+   session ke liye hide.
+   3) index.html me ?v=20260902-home-v5 (purani cached css/js force-reload).
+   ZIP me 3 naye files: index.html, assets/css/shreewin-wheel500-hotfix.css,
+   assets/js/shreewin-wheel500-hotfix.js. PHP files wahi (koi change nahi).
