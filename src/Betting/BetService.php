@@ -219,13 +219,17 @@ class BetService
      *
      * @return array{list:array<int,array<string,mixed>>,total:int}
      */
-    public function history(int $userId, ?string $gameCode, int $pageNo, int $pageSize): array
+    public function history(int $userId, ?string $gameCode, int $pageNo, int $pageSize, ?string $maxIssue = null): array
     {
         $params = [$userId];
         $where  = 'user_id = ?';
         if ($gameCode !== null && $gameCode !== '') {
             $where   .= ' AND game_code = ?';
             $params[] = $gameCode;
+        }
+        if ($maxIssue !== null && $maxIssue !== '') {
+            $where   .= ' AND issue_number < ?';
+            $params[] = $maxIssue;
         }
 
         $total = (int) $this->db->fetchValue('SELECT COUNT(*) FROM ' . Tables::BETS . ' WHERE ' . $where, $params);

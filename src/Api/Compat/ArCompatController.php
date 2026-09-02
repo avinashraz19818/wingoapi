@@ -366,12 +366,12 @@ class ArCompatController
 
         $this->app->settlement()->settleDue($game, min(20, $pageSize + 5), $historyNow);
 
-        // AR-style clients intentionally show the previous round as "current"
-        // (issueData uses now - interval). That "current" round is the newest
-        // finished result, so history must include it and be exactly one period
-        // behind the real open round. We therefore serve up to the actual open
-        // round (the same issue number the timer will advance to).
-        $activeIssue = $this->effectiveActiveIssue($game, $historyNow);
+        // These AR clients intentionally show the previous round as "current"
+        // (issueData uses now - interval). The period shown in the header must
+        // NOT appear in history, so we filter strictly below it. Using the same
+        // lagged round (with the grace window) also makes the just-finished
+        // result move into history automatically at timer end.
+        $activeIssue = $this->clientActiveIssue($game, $historyNow);
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -413,27 +413,24 @@ class ArCompatController
      * Active issue upper-bound for AR history/trend queries.
      *
      * AR-style clients intentionally show the previous round as "current"
-     * (issueData uses now - interval). That displayed round is the newest
-     * finished result and must be the first history row. History is therefore
-     * served up to the issue *after* the client's displayed round — i.e. the
-     * real open round whose countdown is running. Any stale/lagging
-     * client-supplied issue is always bumped forward.
+     * (issueData uses now - interval). That displayed round must not appear in
+     * history, so history is filtered strictly below it (one period behind the
+     * header). When the client does not send it, we use the same lagged round,
+     * and the grace window advances it at the timer boundary so the previous
+     * round moves into history automatically.
      */
-    private function effectiveActiveIssue(GameDefinition $game, int $now): string
+    private function clientActiveIssue(GameDefinition $game, int $now): string
     {
-        $current = (string) $this->app->scheduler()->current($game, $now)->issueNumber;
-        $active  = trim((string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? ''));
+        $active = trim((string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? ''));
 
-        if ($active === '' || !IssueNumber::isValid($active) || !IssueNumber::belongsTo($active, $game)) {
-            return $current;
+        if ($active !== '' && IssueNumber::isValid($active) && IssueNumber::belongsTo($active, $game)) {
+            return $active;
         }
 
-        $clientNext = (string) $this->app->scheduler()->next(
+        return (string) $this->app->scheduler()->issueAt(
             $game,
-            $this->app->scheduler()->fromIssueNumber($game, $active)->startTs
+            $now - $game->seconds
         )->issueNumber;
-
-        return strcmp($clientNext, $current) < 0 ? $current : $clientNext;
     }
 
     /** GetWinTheLotteryResult / GetResult */
@@ -484,7 +481,7 @@ class ArCompatController
         }
 
         $historyNow = Clock::now() + self::HISTORY_END_GRACE_SECONDS;
-        $activeIssue = $this->effectiveActiveIssue($game, $historyNow);
+        $activeIssue = $this->clientActiveIssue($game, $historyNow);
         $engine = $this->app->trends()->statistics($game, 100, $activeIssue);
         foreach ($engine['positions']['number'] ?? [] as $row) {
             $value = (string) $row['value'];
@@ -628,11 +625,16 @@ class ArCompatController
         $pageNo   = Validator::int($this->input, 'pageNo', 1, 1, 1000);
         $pageSize = Validator::int($this->input, 'pageSize', 10, 1, 100);
 
+        $historyNow = Clock::now() + self::HISTORY_END_GRACE_SECONDS;
+
         if ($game !== null) {
-            $this->app->settlement()->settleDue($game, 5);
+            $this->app->settlement()->settleDue($game, 5, $historyNow);
         }
 
-        $history = $this->app->bets()->history($userId, $game?->code, $pageNo, $pageSize);
+        // "My history" also stays one period behind the header, same as the Game
+        // History table, so the displayed period is never shown here.
+        $maxIssue = $game === null ? null : $this->clientActiveIssue($game, $historyNow);
+        $history = $this->app->bets()->history($userId, $game?->code, $pageNo, $pageSize, $maxIssue);
 
         $list = [];
         foreach ($history['list'] as $row) {

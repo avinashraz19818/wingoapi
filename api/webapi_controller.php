@@ -106,11 +106,10 @@ switch (strtolower($action)) {
         } catch (Throwable $e) {}
 
         // This endpoint deliberately runs one period behind the real clock:
-        // $issue['issue_number'] is the round the client is showing (newest
-        // finished result). Serve history up to the real open round
-        // (next_issue_number) so the just-finished round is already present when
-        // the countdown hits zero.
-        $activeIssue = $issue['next_issue_number'] ?? null;
+        // $issue['issue_number'] is the round the client is showing. History is
+        // filtered strictly below it so the Game History table stays one period
+        // behind the header.
+        $activeIssue = $issue['issue_number'] ?? null;
         $history = $syncService->getHistory($gameCode, $pageSize, $activeIssue);
         $list = [];
         foreach ($history as $row) {

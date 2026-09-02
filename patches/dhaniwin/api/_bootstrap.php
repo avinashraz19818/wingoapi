@@ -2359,9 +2359,10 @@ function api_lottery_history_payload(string $gameCode, array $input): array
 
     $offset = ($pageNo - 1) * $pageSize;
     $list = [];
-    // AR clients show the previous round as "current"; that round is the newest
-    // finished result, so it must be the first row. $i = 0 => latest finished.
-    for ($i = 0; count($list) < $pageSize; $i++) {
+    // AR clients show the previous round as "current"; history must stay one
+    // period behind that displayed round, so $i starts at 1. The grace window
+    // above makes the just-finished result move into history at timer end.
+    for ($i = 1; count($list) < $pageSize; $i++) {
         $drawTimeMs = $lagStart - (($offset + $i) * $periodMs);
         $issueNumber = api_lottery_calculate_issue($gameCode, (int)($drawTimeMs / 1000));
         $row = api_lottery_ensure_result($gameCode, $issueNumber);
