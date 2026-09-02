@@ -102,3 +102,5 @@ hai: betMultiples = [1,5,20,50,100] -> row dikhega X1 X5 X20 X50 X100
 (jaise real game me). Pehle [1,2,3,4,5,10,20,50,100] tha isliye X1 X2 X3...
  Chal raha tha. Sirf bootstrap_live_v4.php replace karna hai (size check: naya
 file chhota hi rahega ~same, 500-fix wali line ab bhi andar hai).
+
+v8: user maanga X10 bhi -> final list [1,5,10,20,50,100] = X1 X5 X10 X20 X50 X100
