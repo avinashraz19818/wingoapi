@@ -116,6 +116,36 @@ Per family the row also carries: **K3** `dice`, `openCode`, `sum`, `size`,
 
 ---
 
+## 2b. How far behind the clock the feed runs (`ISSUE_OFFSET`)
+
+```ini
+ISSUE_OFFSET=-1     # result 1 period piche
+```
+
+| `ISSUE_OFFSET` | while round N is live, the newest row in the feed is |
+|---|---|
+| `0`  | `N-1` (the round that just closed) |
+| `-1` | `N-2` |
+| `-2` | `N-3` |
+
+The cap is applied server-side on `GetHistoryIssuePage`,
+`GetNoaverageEmerdList`, `GetGameIssue.lastIssue`, `GetResult` and
+`/api/Feed?action=History|Result`, so a customer cannot read a held-back round
+by asking for it by number or by passing their own `activeIssue`.
+
+It is a **publication** delay only:
+
+- the round is still drawn and every bet on it is still paid out on the real
+  clock, a full period before anyone can see the number;
+- by the time it is published it is immutable and can no longer be overridden;
+- the live `issueNumber` and `remaining` countdown are untouched, so client
+  timers stay correct.
+
+`GetGameIssue` returns `publicationLag` so a customer's site can tell whether
+its board is intentionally behind.
+
+---
+
 ## 3. Domain whitelist
 
 **Nobody reads the feed unless you allow them.** Admin panel → **Domains**.

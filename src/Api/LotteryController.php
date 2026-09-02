@@ -376,10 +376,10 @@ class LotteryController
         // Make sure everything that has finished is drawn before we page over it.
         $this->app->settlement()->settleDue($game, min(20, $pageSize + 5));
 
-        $activeIssue = (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '');
-        if ($activeIssue === '') {
-            $activeIssue = (string) $this->app->scheduler()->current($game)->issueNumber;
-        }
+        $activeIssue = $this->app->draws()->resolveMaxIssue(
+            $game,
+            (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '')
+        );
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -401,10 +401,12 @@ class LotteryController
 
         $this->app->settlement()->settleDue($game, 5);
 
-        $activeIssue = (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '');
-        if ($activeIssue === '') {
-            $activeIssue = (string) $this->app->scheduler()->current($game)->issueNumber;
-        }
+        // Capped at the publication window too — the missing/appear counters
+        // would otherwise give away a result that is still being held back.
+        $activeIssue = $this->app->draws()->resolveMaxIssue(
+            $game,
+            (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '')
+        );
         return $this->app->trends()->statistics($game, $window, $activeIssue);
     }
 

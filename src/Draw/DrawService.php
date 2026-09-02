@@ -36,6 +36,7 @@ class DrawService
     private OverrideService $overrides;
     private bool $forceRemote;
     private int $fallbackDelay;
+    private int $publicationLag;
 
     public function __construct(
         Connection $db,
@@ -45,7 +46,8 @@ class DrawService
         LocalDrawGenerator $local,
         OverrideService $overrides,
         bool $forceRemote,
-        int $fallbackDelay = 25
+        int $fallbackDelay = 25,
+        int $publicationLag = 0
     ) {
         $this->fallbackDelay = max(0, $fallbackDelay);
         $this->db          = $db;
@@ -55,6 +57,73 @@ class DrawService
         $this->local       = $local;
         $this->overrides   = $overrides;
         $this->forceRemote = $forceRemote;
+        $this->publicationLag = $publicationLag;
+    }
+
+    /* -----------------------------------------------------------------------
+     | Publication window
+     |
+     | A round is *drawn* and *settled* the moment it closes, but it does not
+     | have to become *visible* at the same time. ISSUE_OFFSET holds results
+     | back by whole periods so the feed trails the clock:
+     |
+     |   lag 0 -> while round N is live, the newest published result is N-1
+     |   lag 1 -> while round N is live, the newest published result is N-2
+     |
+     | Every read path that a customer can reach goes through the helpers
+     | below, so a client cannot peek at a held-back round by guessing an
+     | issue number or by passing its own activeIssue.
+     * -------------------------------------------------------------------- */
+
+    /** Periods the published result trails the live round by. */
+    public function publicationLag(): int
+    {
+        return $this->publicationLag;
+    }
+
+    /**
+     * Exclusive upper bound for published results: only issue numbers strictly
+     * below this one may be served.
+     *
+     *   lag 0 -> the live issue number      (newest published = the round that just closed)
+     *   lag 1 -> the previous issue number  (newest published = one round older)
+     */
+    public function visibleBefore(GameDefinition $game, ?int $now = null): string
+    {
+        return $this->scheduler->shifted($game, $this->publicationLag, $now)->issueNumber;
+    }
+
+    /** The newest round that is allowed to be published right now. */
+    public function newestVisible(GameDefinition $game, ?int $now = null): Issue
+    {
+        return $this->scheduler->shifted($game, $this->publicationLag + 1, $now);
+    }
+
+    /** Is this round old enough to be published? */
+    public function isVisible(GameDefinition $game, string $issueNumber, ?int $now = null): bool
+    {
+        // Issue numbers are fixed-width 17-digit strings, so a string compare
+        // is the numeric compare.
+        return $issueNumber < $this->visibleBefore($game, $now);
+    }
+
+    /**
+     * Upper bound to page a history query with.
+     *
+     * A caller-supplied activeIssue is honoured only as far back as the
+     * publication window allows — it can never be used to look *forward* past
+     * a held-back round.
+     */
+    public function resolveMaxIssue(GameDefinition $game, ?string $requested, ?int $now = null): string
+    {
+        $boundary = $this->visibleBefore($game, $now);
+        $requested = trim((string) $requested);
+
+        if ($requested === '' || strcmp($requested, $boundary) > 0) {
+            return $boundary;
+        }
+
+        return $requested;
     }
 
     /**

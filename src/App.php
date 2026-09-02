@@ -164,7 +164,9 @@ class App
             $this->localDraw(),
             $this->overrides(),
             (bool) $this->config['force_remote_draw'],
-            (int) ($this->config['draw_fallback_delay'] ?? 25)
+            (int) ($this->config['draw_fallback_delay'] ?? 25),
+            // Periods the published result trails the clock by (ISSUE_OFFSET=-1 -> 1).
+            (int) ($this->config['publication_lag'] ?? 0)
         ));
     }
 

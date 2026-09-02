@@ -70,12 +70,14 @@ class FeedController
         $pageSize = Validator::int($this->input, 'pageSize', 10, 1, 100);
 
         // Make sure everything that has finished is drawn before we serve it.
+        // Drawing and settling always run on the real clock; only what we are
+        // allowed to *show* is capped, by resolveMaxIssue() below.
         $this->app->settlement()->settleDue($game, min(20, $pageSize + 5));
 
-        $activeIssue = (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '');
-        if ($activeIssue === '') {
-            $activeIssue = (string) $this->app->scheduler()->current($game)->issueNumber;
-        }
+        $activeIssue = $this->app->draws()->resolveMaxIssue(
+            $game,
+            (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '')
+        );
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -94,8 +96,10 @@ class FeedController
     {
         $now      = Clock::now();
         $current  = $this->app->scheduler()->current($game, $now);
-        $previous = $this->app->scheduler()->previous($game, $now);
-        $last     = $this->app->draws()->find($game, $previous->issueNumber);
+        // The newest round we are allowed to publish, which is one period
+        // further back than the live round whenever ISSUE_OFFSET holds results.
+        $newest   = $this->app->draws()->newestVisible($game, $now);
+        $last     = $this->app->draws()->find($game, $newest->issueNumber);
 
         return [
             'gameCode'      => $game->code,
@@ -106,6 +110,7 @@ class FeedController
             'bettingOpen'   => $current->isOpenAt($now),
             'serverTime'    => Clock::dateTime($now),
             'lastIssue'     => $last === null ? null : $this->row($game, $last),
+            'publicationLag'=> $this->app->draws()->publicationLag(),
         ];
     }
 
@@ -145,11 +150,17 @@ class FeedController
         $issueNumber = Validator::issueNumber(Validator::requireString($this->input, 'issueNumber', 17));
         $issue       = $this->app->scheduler()->fromIssueNumber($game, $issueNumber);
 
+        // Settle first: paying a winner must never depend on whether the round
+        // is inside the publication window yet.
         $this->app->settlement()->settleIssue($game, $issue);
         $row = $this->app->draws()->find($game, $issueNumber);
 
         if ($row === null) {
             throw ApiException::notFound('That round has not been drawn yet');
+        }
+
+        if (!$this->app->draws()->isVisible($game, $issueNumber)) {
+            throw ApiException::notFound('That round has not been published yet');
         }
 
         return $this->row($game, $row);

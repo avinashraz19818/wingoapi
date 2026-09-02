@@ -99,6 +99,20 @@ $profileName = Env::get('DRAW_PROFILE', 'generic');
 $profile     = $drawProfiles[$profileName] ?? $drawProfiles['generic'];
 
 /**
+ * ISSUE_OFFSET — how far the *published* result trails the live round.
+ *
+ *   0  standard  : while round N is live, the newest published result is N-1
+ *  -1  1 behind  : while round N is live, the newest published result is N-2
+ *                  (the "result 1 period piche" behaviour)
+ *  +1  1 ahead   : the live round is published too, if it already has a result
+ *
+ * Only *publication* moves. Draws are still resolved and bets still settled on
+ * the real clock, so a held-back round is paid out long before anyone sees it
+ * and can no longer be overridden by then.
+ */
+$issueOffset = Env::int('ISSUE_OFFSET', -1);
+
+/**
  * Interval catalogue.
  *   code    -> suffix used in the game code (WinGo_1M)
  *   seconds -> round length
@@ -193,6 +207,13 @@ return [
     // false -> fall back to the local HMAC-SHA256 deterministic generator
     'force_remote_draw' => Env::bool('FORCE_REMOTE_DRAW', false),
     'draw_secret'       => Env::get('DRAW_SECRET', 'change-me-draw-secret'),
+
+    /* ------------------------------------------------- result publication */
+    // See $issueOffset above for what each value means.
+    'issue_offset'      => $issueOffset,
+    // Same knob, expressed the way DrawService uses it: a positive number of
+    // periods the published result trails the clock by. (-1 -> lag 1)
+    'publication_lag'   => -$issueOffset,
 
     /* ---------------------------------------------------------------- games */
     'intervals' => $intervals,

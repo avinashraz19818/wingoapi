@@ -878,6 +878,12 @@ class AdminService
                 'sample'   => $fetcher->endpoint($this->app->registry()->all()[0]),
             ],
             'rateLimit' => (int) $this->app->config('feed.rate_limit'),
+            // How far the published result trails the clock, so an operator can
+            // see at a glance that ISSUE_OFFSET is holding rounds back.
+            'resultLag' => [
+                'periods'    => $this->app->draws()->publicationLag(),
+                'issueOffset'=> (int) $this->app->config('issue_offset', 0),
+            ],
         ];
     }
 

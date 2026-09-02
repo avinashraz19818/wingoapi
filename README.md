@@ -10,6 +10,7 @@ Designed for Linux VPS deployment under domain **`api.devlopedwithzayro.site`**.
 1. **Auto Sync Engine**: Pulls draw results from external provider (`draw.ar-lottery01.com`) or fallback simulator.
 2. **ACID Settlement Engine**: Atomically calculates winners, applies official color rules (Green/Red 2x, Half-Violet 1.5x on 0/5, Violet 4.5x, Number 9x), and credits player wallets.
 3. **Period & Timing Management**: Millisecond-accurate period numbering (`YYYYMMDDxxxxx`) with dynamic lockout prevention for ultra-fast 30s games.
+3b. **Configurable Result Lag** (`ISSUE_OFFSET`): publish results N periods behind the clock (`-1` = result 1 period piche) without delaying draws or payouts.
 4. **Race-Condition Protection**: Row-level locking (`FOR UPDATE`) on balance checks and settlements.
 5. **REST API Gateway**: Clean JSON API with global CORS headers for easy frontend/app integration.
 6. **24/7 VPS Background Daemon**: Integrated Systemd worker for continuous background synchronization.
@@ -187,6 +188,40 @@ The installer will automatically:
 
 ### 7. System Health Check
 - **URL**: `GET /api/health` or `GET /`
+
+---
+
+## ⏱️ Result Lag (`ISSUE_OFFSET`)
+
+Controls how far the **published** result trails the live round. Draws and
+payouts are unaffected — they always run on the real clock.
+
+| `ISSUE_OFFSET` | while period N is live, the newest published result is |
+|---|---|
+| `0`  | `N-1` — standard |
+| `-1` | `N-2` — **result 1 period piche** (default) |
+| `-2` | `N-3` — two periods behind |
+
+```ini
+# .env
+ISSUE_OFFSET=-1
+```
+
+Enforced on every public read path (`GetHistoryIssuePage`,
+`GetNoaverageEmerdList`, `GetTrendStatistics`, `GetGameIssue.lastIssue`,
+`GetResult`), on all three surfaces — `/api/Lottery`, the `/WinGo/...json`
+feed and `/api/compat`. `totalCount`/`totalPage` shrink with the window, and a
+caller-supplied `activeIssue` is clamped, so a held-back round cannot be read
+by guessing its number.
+
+Not affected: the live period number and countdown, settlement/wallet credit,
+the player's own `GetRecordPage` / `GetWinLossResult`, and the admin panel.
+
+Verify with:
+
+```bash
+php tests/result_lag.php
+```
 
 ---
 

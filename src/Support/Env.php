@@ -67,6 +67,12 @@ final class Env
         return is_numeric($raw) ? (float) $raw : $default;
     }
 
+    public static function int(string $key, int $default = 0): int
+    {
+        $raw = self::get($key, (string) $default);
+        return is_numeric($raw) ? (int) $raw : $default;
+    }
+
     /** Testing helper. */
     public static function reset(): void
     {

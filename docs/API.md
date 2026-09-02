@@ -307,8 +307,37 @@ curl -X POST "https://api.example.com/api/Lottery?action=WinGoBet" \
 Replaying the same `requestGroupKey` + `requestKey` returns the original bet with
 `"duplicate": true` and does not charge the wallet again.
 
+## Result publication window (`ISSUE_OFFSET`)
+
+A round is **drawn** and **settled** the moment it closes, but `ISSUE_OFFSET`
+controls when it becomes **visible**:
+
+| `ISSUE_OFFSET` | while round N is live, the newest published result is |
+|---|---|
+| `0`  | `N-1` — standard |
+| `-1` | `N-2` — result one period behind |
+| `-2` | `N-3` — two periods behind |
+
+The window is enforced on every public read path — `GetHistoryIssuePage`,
+`GetTrendStatistics`, `GetGameIssue.lastIssue`, `GetResult` /
+`GetWinTheLotteryResult` on all three surfaces (Lottery API, feed,
+`/api/compat`) — and `totalCount` / `totalPage` shrink with it, so a client
+paging to the end cannot find the held-back round either.
+
+What it does **not** change:
+
+- the live issue number and the countdown,
+- draw resolution (upstream / override / local generator),
+- settlement and wallet credit,
+- the caller's own records (`GetRecordPage`, `GetWinLossResult`) and the admin
+  panel — those always show the truth.
+
+`GetGameIssue` reports the setting as `publicationLag`, and Admin →
+`FeedInfo` returns it under `resultLag`.
+
 ## `GET ?action=GetHistoryIssuePage&gameCode=WinGo_1M&pageNo=1&pageSize=10`
-Drawn results, newest first. Finished rounds are drawn and settled on demand. *(public)*
+Drawn results, newest first, limited to the publication window above. Finished
+rounds are drawn and settled on demand. *(public)*
 
 ## `GET ?action=GetRecordPage&gameCode=WinGo_1M&pageNo=1&pageSize=10` *(auth)*
 The caller's bets (omit `gameCode` for all games), including status and payout.

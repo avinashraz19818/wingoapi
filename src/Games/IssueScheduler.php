@@ -74,8 +74,29 @@ class IssueScheduler
 
     public function previous(GameDefinition $game, ?int $timestamp = null): Issue
     {
-        $current = $this->issueAt($game, $timestamp);
-        return $this->issueAt($game, $current->startTs - 1);
+        return $this->shifted($game, 1, $timestamp);
+    }
+
+    /**
+     * The issue that sits $periods rounds away from the current one.
+     *
+     * Positive moves back in time (1 = previous round), negative moves forward.
+     * Walking round-by-round instead of adding to the timestamp keeps the
+     * result correct across the midnight rollover, where the daily sequence —
+     * and therefore the issue number — restarts.
+     */
+    public function shifted(GameDefinition $game, int $periods, ?int $timestamp = null): Issue
+    {
+        $issue = $this->issueAt($game, $timestamp);
+
+        for ($i = 0; $i < $periods; $i++) {
+            $issue = $this->issueAt($game, $issue->startTs - 1);   // one round back
+        }
+        for ($i = 0; $i > $periods; $i--) {
+            $issue = $this->issueAt($game, $issue->endTs);         // one round forward
+        }
+
+        return $issue;
     }
 
     /**

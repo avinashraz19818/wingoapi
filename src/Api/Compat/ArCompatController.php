@@ -350,10 +350,10 @@ class ArCompatController
 
         $this->app->settlement()->settleDue($game, min(20, $pageSize + 5));
 
-        $activeIssue = (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '');
-        if ($activeIssue === '') {
-            $activeIssue = (string) $this->app->scheduler()->current($game)->issueNumber;
-        }
+        $activeIssue = $this->app->draws()->resolveMaxIssue(
+            $game,
+            (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '')
+        );
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -409,6 +409,12 @@ class ArCompatController
             return self::fail('Result not found', 404);
         }
 
+        // Held back by ISSUE_OFFSET: treat it exactly like a round that has not
+        // been drawn yet, so the front-end keeps showing its waiting state.
+        if (!$this->app->draws()->isVisible($game, $issueNumber)) {
+            return self::fail('Result not found', 404);
+        }
+
         $mapped = ArTranslator::fromEngineResult($game->family, $row['result'] ?? []);
         return self::ok([
             [
@@ -438,10 +444,10 @@ class ArCompatController
             $stats[(string) $digit] = ['appear' => 0, 'missing' => 0, 'maxContinuous' => 0];
         }
 
-        $activeIssue = (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '');
-        if ($activeIssue === '') {
-            $activeIssue = (string) $this->app->scheduler()->current($game)->issueNumber;
-        }
+        $activeIssue = $this->app->draws()->resolveMaxIssue(
+            $game,
+            (string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? '')
+        );
         $engine = $this->app->trends()->statistics($game, 100, $activeIssue);
         foreach ($engine['positions']['number'] ?? [] as $row) {
             $value = (string) $row['value'];
