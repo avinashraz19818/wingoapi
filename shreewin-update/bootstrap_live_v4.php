@@ -1048,6 +1048,63 @@ function sl_display_issue($gameCode)
 }
 
 /**
+ * Highest issue number players may see in history right now.
+ *
+ * Two independent reveal signals race each other and the earlier one wins:
+ *  1. the wall-clock boundary (sl_display_issue), and
+ *  2. the provider's own latest closed result from the history batch just
+ *     fetched — this keeps the reveal glued to the frontend countdown even
+ *     when the provider's period labels run ahead of, or lag behind, the
+ *     server clock, which is exactly the skew that made a result arrive one
+ *     extra cycle after the on-screen timer ended.
+ * The maximum of the two is used so the reveal never waits for the slower
+ * signal and never exposes a period the provider has not closed yet.
+ * For lag=0 this collapses to the historical live behaviour.
+ */
+function sl_visible_gate_issue($gameCode, array $providerList = array())
+{
+    $clockGate = sl_display_issue($gameCode);
+    $lag = sl_period_lag_periods();
+    if ($lag <= 0) {
+        $clockGate = sl_wingo_current_issue($gameCode);
+    }
+    $latest = '';
+    foreach ($providerList as $item) {
+        if (!isset($item['issueNumber'])) {
+            continue;
+        }
+        $issue = (string) $item['issueNumber'];
+        if (preg_match('/^[0-9]{17}$/', $issue) && strcmp($issue, $latest) > 0) {
+            $latest = $issue;
+        }
+    }
+    if ($latest === '' || strlen($clockGate) !== 17) {
+        return $clockGate;
+    }
+    $interval = sl_interval_seconds($gameCode);
+    $dayStart = strtotime(substr($latest, 0, 4) . '-' . substr($latest, 4, 2) . '-' . substr($latest, 6, 2) . ' 00:00:00 UTC');
+    $sequence = (int) substr($latest, -4);
+    if ($dayStart === false || $sequence < 1) {
+        return $clockGate;
+    }
+    $latestStart = $dayStart + (($sequence - 1) * $interval);
+    // Sanity: the provider's latest closed period must sit within one cycle
+    // of the local wall-clock boundary. A mislabelled batch (foreign-timezone
+    // mirrors) is ignored so results can never be revealed prematurely; the
+    // clock gate keeps serving until the data realigns.
+    $liveStart = time() - (time() % $interval);
+    if (abs($latestStart - $liveStart) > 2 * $interval) {
+        return $clockGate;
+    }
+    // The provider's latest closed period is visible when lag=1 only once the
+    // frontend's current period (that same latest one) has closed on-screen,
+    // so the gate equals the provider's latest closed issue itself:
+    // visible issues are everything strictly below that number.
+    $providerGate = sl_issue_number_for_start($gameCode, $latestStart - (($lag - 1) * $interval));
+    return strcmp($providerGate, $clockGate) > 0 ? $providerGate : $clockGate;
+}
+
+/**
  * Shift the period numbers of a current/next payload backwards by the
  * configured lag while keeping the provider's real start/end timestamps, so
  * the frontend countdown, the betting lock and the accepted issue number stay
@@ -1784,12 +1841,12 @@ function sl_place_bet($user, $input)
     }
 }
 
-function sl_cached_history($gameCode, $limit = 100)
+function sl_cached_history($gameCode, $limit = 100, array $providerList = array())
 {
     global $conn;
     $limit = min(500, max(1, (int) $limit));
     $currentIssue = sl_wingo_current_issue($gameCode);
-    $visibleIssue = sl_display_issue($gameCode);
+    $visibleIssue = sl_visible_gate_issue($gameCode, $providerList);
     if ($currentIssue !== '') {
         sl_prune_unsettled_future_results($gameCode, $currentIssue);
     }
@@ -1817,15 +1874,23 @@ function sl_history_provider_fallback($gameCode, $payload, $pageNo, $pageSize)
         ? $payload['data']
         : array();
     $rawList = isset($source['list']) && is_array($source['list']) ? $source['list'] : array();
-    $currentIssue = sl_display_issue($gameCode);
-    $list = array();
+    $usable = array();
     foreach ($rawList as $rawItem) {
         $item = sl_normalize_result_item($gameCode, $rawItem);
-        if ($item && ($currentIssue === '' || strcmp((string)$item['issueNumber'], $currentIssue) < 0)) {
+        if ($item) {
+            $usable[] = $item;
+        }
+    }
+    // Canonicalise mirrored labels first, then apply the same reveal gate as
+    // sl_history_page: provider's own latest closed issue vs the wall clock.
+    $usable = sl_rebind_wingo_history_periods($gameCode, $usable);
+    $gateIssue = sl_visible_gate_issue($gameCode, $usable);
+    $list = array();
+    foreach ($usable as $item) {
+        if ($gateIssue === '' || strcmp((string)$item['issueNumber'], $gateIssue) < 0) {
             $list[] = $item;
         }
     }
-    $list = sl_rebind_wingo_history_periods($gameCode, $list);
 
     $totalCount = isset($source['totalCount']) && is_numeric($source['totalCount'])
         ? max(0, (int)$source['totalCount'])
@@ -1899,7 +1964,15 @@ function sl_history_page($gameCode, $input = array())
         }
 
         $currentIssue = sl_wingo_current_issue($gameCode);
-        $visibleIssue = sl_display_issue($gameCode);
+        // Page one reveals the just-closed period the moment either the clock
+        // or the provider's own latest result says it is done; deeper pages
+        // are older than both gates anyway and keep the plain clock gate.
+        $providerList = (is_array($payload) && isset($payload['data']['list']) && is_array($payload['data']['list']))
+            ? $payload['data']['list']
+            : array();
+        $visibleIssue = $pageNo === 1
+            ? sl_visible_gate_issue($gameCode, $providerList)
+            : sl_display_issue($gameCode);
         if ($currentIssue !== '') {
             sl_prune_unsettled_future_results($gameCode, $currentIssue);
         }
@@ -2072,8 +2145,11 @@ function sl_history_values($gameCode, $item)
 
 function sl_trend($gameCode)
 {
-    sl_sync_results($gameCode);
-    $history = sl_cached_history($gameCode, 100);
+    $payload = sl_sync_results($gameCode);
+    $providerList = (is_array($payload) && isset($payload['data']['list']) && is_array($payload['data']['list']))
+        ? $payload['data']['list']
+        : array();
+    $history = sl_cached_history($gameCode, 100, $providerList);
     $family = sl_game_family($gameCode);
     $positionCount = $family === 'D5' ? 5 : ($family === 'K3' || $family === 'MotoRace' ? 3 : 1);
     $numbers = $family === 'K3' ? range(1,6) : ($family === 'MotoRace' ? range(1,10) : range(0,9));
