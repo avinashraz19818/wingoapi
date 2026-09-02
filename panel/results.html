@@ -74,7 +74,7 @@ footer{padding:18px 20px;border-top:1px solid var(--line);color:var(--muted);fon
 (() => {
 'use strict';
 const FEED = '/api/Feed';
-const state = { games: [], family: 'all', results: {}, busy: {} };
+const state = { games: [], family: 'all', results: {}, busy: {}, reveal: {}, revealTimer: {}, revealAttempts: {} };
 
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -170,14 +170,50 @@ function renderTabs() {
   });
 }
 
+function clearReveal(gameCode) {
+  state.reveal[gameCode] = null;
+  state.revealAttempts[gameCode] = 0;
+  if (state.revealTimer[gameCode]) {
+    clearTimeout(state.revealTimer[gameCode]);
+    state.revealTimer[gameCode] = null;
+  }
+}
+
 async function loadResults(gameCode) {
   if (state.busy[gameCode]) return;
   state.busy[gameCode] = true;
   try {
     const data = await feed('History', { gameCode, pageSize: 10 });
     state.results[gameCode] = data.list;
+
+    const pending = state.reveal[gameCode];
+    if (pending) {
+      const found = data.list.some(r => String(r.issueNumber || r.issue_number || '') === String(pending));
+      if (found) {
+        clearReveal(gameCode);
+      } else {
+        const game = state.games.find(g => g.gameCode === gameCode);
+        const maxAttempts = Math.max(20, Math.ceil((game ? game.intervalSeconds : 60) / 1.5) + 15);
+        state.revealAttempts[gameCode] = (state.revealAttempts[gameCode] || 0) + 1;
+        if (state.revealAttempts[gameCode] < maxAttempts) {
+          state.revealTimer[gameCode] = setTimeout(() => loadResults(gameCode), 1200);
+        } else {
+          clearReveal(gameCode);
+        }
+      }
+    }
   } catch (e) {
-    /* keep the previous rows on a transient error */
+    /* keep the previous rows on a transient error; keep retrying while awaiting */
+    if (state.reveal[gameCode]) {
+      const game = state.games.find(g => g.gameCode === gameCode);
+      const maxAttempts = Math.max(20, Math.ceil((game ? game.intervalSeconds : 60) / 1.5) + 15);
+      state.revealAttempts[gameCode] = (state.revealAttempts[gameCode] || 0) + 1;
+      if (state.revealAttempts[gameCode] < maxAttempts) {
+        state.revealTimer[gameCode] = setTimeout(() => loadResults(gameCode), 1200);
+      } else {
+        clearReveal(gameCode);
+      }
+    }
   }
   state.busy[gameCode] = false;
 }
@@ -207,6 +243,17 @@ setInterval(() => {
     const game = state.games.find((g) => g.gameCode === gameCode);
 
     if (left <= 0) {
+      // The round that just finished is the one currently shown as the issue.
+      // Remember it so loadResults() keeps retrying until that result is drawn.
+      if (game && game.currentIssue) {
+        state.reveal[gameCode] = String(game.currentIssue);
+        state.revealAttempts[gameCode] = 0;
+        if (state.revealTimer[gameCode]) {
+          clearTimeout(state.revealTimer[gameCode]);
+          state.revealTimer[gameCode] = null;
+        }
+      }
+
       el.dataset.remaining = game ? game.intervalSeconds : 60;
       el.textContent = mmss(Number(el.dataset.remaining));
       setTimeout(async () => {
@@ -216,9 +263,10 @@ setInterval(() => {
           el.dataset.remaining = issue.remaining;
           const issueEl = el.closest('[data-game]').querySelector('[data-issue]');
           if (issueEl) issueEl.textContent = issue.issueNumber;
-          await loadResults(gameCode);
-          render();
-        } catch (e) { /* retry next tick */ }
+        } catch (e) { /* feed refresh will retry; history below still retries */ }
+
+        await loadResults(gameCode);
+        render();
       }, 1500);
       return;
     }

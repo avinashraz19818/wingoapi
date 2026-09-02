@@ -1080,6 +1080,10 @@
         let activeTableTab = 'history';
         let remainingSeconds = 0;
         let isLocked = false;
+        let revealIssue = null;
+        let revealTimer = null;
+        let revealStartedAt = 0;
+        let hasSeenCountdown = false;
 
         document.addEventListener('DOMContentLoaded', () => {
             // Highlight selected game button
@@ -1120,6 +1124,7 @@
             el.classList.add('active');
             updatePeriodGameLabel();
             clearBetSelection();
+            clearRevealRefresh();
             fetchIssueInfo();
             fetchHistory();
             fetchUserBets();
@@ -1218,21 +1223,90 @@
             }
         }
 
+        function getGameIntervalSeconds() {
+            const map = {
+                'WinGo_30S': 30,
+                'WinGo_1M': 60,
+                'WinGo_3M': 180,
+                'WinGo_5M': 300,
+                'WinGo_10M': 600
+            };
+            return map[currentGame] || 60;
+        }
+
+        function clearRevealRefresh() {
+            revealIssue = null;
+            revealStartedAt = 0;
+            hasSeenCountdown = false;
+            if (revealTimer) {
+                clearTimeout(revealTimer);
+                revealTimer = null;
+            }
+        }
+
+        // Called the moment the local countdown hits 00.
+        // The issue shown in "Next" is the round that just finished, so we keep
+        // refreshing until its result appears in history (the worker may need a
+        // few seconds to sync the draw).
+        function beginRevealRefresh() {
+            const finishedIssue = document.getElementById('nextIssueNum').innerText;
+            if (!finishedIssue || finishedIssue === '-' || finishedIssue === 'Loading...') return;
+
+            revealIssue = String(finishedIssue);
+            revealStartedAt = Date.now();
+            if (revealTimer) clearTimeout(revealTimer);
+            refreshAfterReveal();
+        }
+
+        async function refreshAfterReveal() {
+            if (!revealIssue) return;
+
+            try {
+                const results = await Promise.all([
+                    fetchIssueInfo(),
+                    fetchHistory(),
+                    fetchUserBets(),
+                    fetchWallet()
+                ]);
+
+                // fetchHistory() returns true when the finished issue is visible.
+                if (results[1]) {
+                    clearRevealRefresh();
+                    return;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
+            // Keep retrying for a full round + 15s (at minimum 20s) so a slow
+            // provider / worker sync can still land before we give up.
+            const maxMs = Math.max(20000, (getGameIntervalSeconds() * 1000) + 15000);
+            if (Date.now() - revealStartedAt >= maxMs) {
+                clearRevealRefresh();
+                return;
+            }
+
+            revealTimer = setTimeout(refreshAfterReveal, 1000);
+        }
+
         function startPolling() {
             setInterval(() => {
                 if (remainingSeconds > 0) {
+                    hasSeenCountdown = true;
                     remainingSeconds--;
                     updateCountdownUI();
-                } else {
-                    fetchIssueInfo();
-                    fetchHistory();
-                    fetchUserBets();
-                    fetchWallet();
+                } else if (revealIssue === null && hasSeenCountdown) {
+                    beginRevealRefresh();
                 }
             }, 1000);
 
+            // Slow safety poll: keeps timer, history, bets and wallet in sync
+            // even if the one-frame reveal refresh misses a slow draw.
             setInterval(() => {
                 fetchIssueInfo();
+                fetchHistory();
+                fetchUserBets();
+                fetchWallet();
             }, 8000);
         }
 
@@ -1333,13 +1407,15 @@
         }
 
         // Fetch History
+        // Returns true when the round we are waiting for (if any) is now visible.
         async function fetchHistory() {
             try {
                 const res = await fetch(`api/get_history.php?game=${currentGame}&limit=15`);
                 const json = await res.json();
                 const tbody = document.getElementById('historyTableBody');
                 if (json.code === 0 && json.data.list.length > 0) {
-                    tbody.innerHTML = json.data.list.map(row => {
+                    const rows = json.data.list;
+                    tbody.innerHTML = rows.map(row => {
                         const num = parseInt(row.number);
                         const isBig = num >= 5;
                         let ballClass = 'ball-green';
@@ -1349,18 +1425,31 @@
 
                         return `
                             <tr>
-                                <td style="font-weight: 700; color: #38bdf8;">${row.issue_number}</td>
-                                <td><span class="draw-ball ${ballClass}">${num}</span></td>
+                                <td style="font-weight: 700; color: #38bdf8;">${row.issue_number || row.issueNumber || ''}</td>
+                                <td><span class="draw-ball ${ballClass}">${String(row.number)}</span></td>
                                 <td><span style="font-weight: 700; color: ${isBig ? '#f59e0b' : '#38bdf8'}">${isBig ? 'Big' : 'Small'}</span></td>
                                 <td><span style="text-transform: capitalize;">${row.color}</span></td>
-                                <td style="color: var(--text-secondary); font-size: 0.8rem;">${row.draw_time}</td>
+                                <td style="color: var(--text-secondary); font-size: 0.8rem;">${row.draw_time || row.drawTime || ''}</td>
                             </tr>
                         `;
                     }).join('');
+
+                    if (revealIssue) {
+                        const found = rows.some(row =>
+                            String(row.issue_number || row.issueNumber || '').trim() === revealIssue.trim()
+                        );
+                        if (found) {
+                            clearRevealRefresh();
+                            return true;
+                        }
+                    }
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No results yet. Waiting for the first draw...</td></tr>`;
                 }
             } catch (e) {
                 console.error(e);
             }
+            return false;
         }
 
         // Fetch User Bets
