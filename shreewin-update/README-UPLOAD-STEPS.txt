@@ -96,3 +96,9 @@ sl_settlement_allowed) fatale kar rahi thi -> results refresh-refresh ke baad
 aa rahe the AUR GetWinLossResult 500 de raha tha (popup isliye nahi aaya).
 Ab gate same batch wale; popup endpoint try/catch-protected (kabhi 500 nahi).
 Sirf saas_lottery/bootstrap_live_v4.php replace karna hai.
+
+v7 CHANGE (CSS/multiplier): server ab sl_game_info me sahi multipliers bhejta
+hai: betMultiples = [1,5,20,50,100] -> row dikhega X1 X5 X20 X50 X100
+(jaise real game me). Pehle [1,2,3,4,5,10,20,50,100] tha isliye X1 X2 X3...
+ Chal raha tha. Sirf bootstrap_live_v4.php replace karna hai (size check: naya
+file chhota hi rahega ~same, 500-fix wali line ab bhi andar hai).

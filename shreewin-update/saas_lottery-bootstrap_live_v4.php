@@ -488,7 +488,9 @@ function sl_game_info($gameCode)
     return array(
         'state' => sl_game_enabled($gameCode) ? 1 : 2,
         'betScopes' => $family === 'MotoRace' ? array(1,10,50,100) : array(1,10,100,1000),
-        'betMultiples' => array(1,2,3,4,5,10,20,50,100),
+        // Must match the reference game's multiplier row (X1 X5 X20 X50 X100);
+        // the client renders exactly this list in Betting__C-multiple.
+        'betMultiples' => array(1,5,20,50,100),
         'webSocketUrl' => '',
         'rates' => sl_game_rates($gameCode)
     );
