@@ -2154,6 +2154,7 @@ function sl_win_loss($userId, $input)
     // that issue is the final upstream outcome (cached a full period ago), so
     // settling now is safe: it only aligns the payout popup with the on-screen
     // countdown instead of delaying it by network/clock skew.
+    $forced = 0;
     if ((int) $total > 0 && (int) $pending > 0 && $gameCode !== '') {
         $res = $conn->prepare('SELECT premium FROM saas_lottery_results WHERE game_code=? AND issue_number=? LIMIT 1');
         $res->bind_param('ss', $gameCode, $issue);
@@ -2168,6 +2169,7 @@ function sl_win_loss($userId, $input)
             ));
             if ($item) {
                 sl_settle_issue($gameCode, (string) $issue, $item);
+                $forced = 1;
                 $again = $conn->prepare("SELECT COUNT(*),SUM(status='pending'),SUM(status='won'),COALESCE(SUM(payout),0) FROM saas_lottery_bets WHERE user_id=? AND issue_number=?");
                 $again->bind_param('is', $userId, $issue);
                 $again->execute();
@@ -2175,6 +2177,19 @@ function sl_win_loss($userId, $input)
                 $again->fetch();
                 $again->close();
             }
+        }
+    }
+    global $SL_CONFIG;
+    if (!empty($SL_CONFIG['winloss_debug'])) {
+        $logDir = dirname(__FILE__).'/logs';
+        if (is_dir($logDir) || @mkdir($logDir, 0775, true)) {
+            @file_put_contents($logDir.'/winloss.log', sprintf(
+                "%s uid=%d game=%s issue=%s total=%d pending=%d forced=%d win=%s amount=%s\n",
+                date('c'), (int) $userId, (string) $gameCode, (string) $issue,
+                (int) $total, (int) $pending, $forced,
+                ((int) $total === 0 || (int) $pending > 0) ? 'NULL' : ((int) $won > 0 ? 'WIN' : 'LOSE'),
+                (string) $winAmount
+            ), FILE_APPEND | LOCK_EX);
         }
     }
     if ((int) $total === 0 || (int) $pending > 0) {

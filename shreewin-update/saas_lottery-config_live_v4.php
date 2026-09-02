@@ -15,6 +15,9 @@ return array(
     // behind for every game (30s game -> 30s buffer, 10m game -> 10m buffer).
     // Set to 0 to return to the live upstream timing.
     'period_lag' => 1,
+    // Temporary diagnostics for the win/lose popup: one line per popup query
+    // in saas_lottery/logs/winloss.log. Set to false to stop logging.
+    'winloss_debug' => true,
     'maximum_stake' => 1000000,
     'games' => array(
         'WinGo_30S' => array('name' => 'WinGo 30sec', 'lottery' => 'WinGo', 'interval' => 0.5, 'sort' => 44),

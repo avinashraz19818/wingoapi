@@ -86,3 +86,7 @@ v4 CHANGE: Win/Lose popup (winning-loss popup) fix — GetWinLossResult ab
 client ke timer-end par status null nahi dega: agar us period ka result DB me
 cached hai to server pending bet ko usi request me settle karke seedha
 won/lost + amount return karega. Popup ab clock-skew se unaffected aayega.
+
+v5 CHANGE: WinLoss popup diagnostics — config_live_v4.php me naya key
+'winloss_debug' => true (false karne par logging off). Har popup-query
+ki entry log hoti hai: saas_lottery/logs/winloss.log (file khud ban jayegi).
