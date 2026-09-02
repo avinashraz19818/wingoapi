@@ -1151,6 +1151,21 @@ function sl_prune_unsettled_future_results($gameCode, $currentIssue = '')
     $stmt->close();
 }
 
+/**
+ * Settlement must wait for the on-screen countdown of the chosen period, not
+ * for the upstream result. With the display lag the real result of the
+ * visible period is already cached a full cycle early, so pending bets are
+ * held until the issue falls behind the visible-reveal gate — the exact
+ * moment the countdown ends and the result is revealed in history. Because
+ * this mirrors sl_visible_gate_issue, payout and on-screen reveal always land
+ * on the same request cycle. With period_lag=0 the gate equals the live
+ * current issue, i.e. the original immediate-settlement behaviour.
+ */
+function sl_settlement_gate_issue($gameCode, array $providerList = array())
+{
+    return sl_visible_gate_issue($gameCode, $providerList);
+}
+
 function sl_save_and_settle_results($gameCode, $list)
 {
     global $conn;
@@ -1166,6 +1181,10 @@ function sl_save_and_settle_results($gameCode, $list)
         }
     }
     if (!$normalized) return;
+
+    // Bets stay pending until the visible-reveal gate passes their issue, so
+    // payout and the on-screen result always appear together.
+    $settleGate = sl_settlement_gate_issue($gameCode, array_values($normalized));
 
     // WinGo uses an exact issue-bound override.  Keep the old one-shot
     // fallback only for legacy TrxWinGo admin pages that do not yet submit an
@@ -1224,15 +1243,15 @@ function sl_save_and_settle_results($gameCode, $list)
             // period earlier, so replay settlement for pending bets instead of
             // leaving them stuck. sl_settle_issue only touches rows that are
             // still status='pending', which keeps this idempotent.
-            if (!empty($pending[$issue])) {
+            if (!empty($pending[$issue]) && ($settleGate === '' || strcmp($issue, $settleGate) < 0)) {
                 $replay = sl_normalize_result_item($gameCode, array(
                     'issueNumber' => $issue,
                     'premium' => (string) $existing[$issue],
                 ));
                 if ($replay) {
                     sl_settle_issue($gameCode, $issue, $replay);
+                    unset($pending[$issue]);
                 }
-                unset($pending[$issue]);
             }
             continue;
         }
@@ -1303,7 +1322,7 @@ function sl_save_and_settle_results($gameCode, $list)
             sl_admin_override_mark_applied($conn, $gameCode, $issue);
         }
 
-        if (!empty($pending[$issue])) {
+        if (!empty($pending[$issue]) && sl_settlement_allowed($gameCode, $issue)) {
             sl_settle_issue($gameCode, $issue, $item);
         }
     }

@@ -1,60 +1,83 @@
-SHREEWIN - 1 PERIOD PICHE (RESULT LAG) UPDATE  v2
+SHREEWIN - 1 PERIOD PICHE (RESULT LAG) UPDATE  v3
 ==================================================
-v2 me fix: result TIMER END KARTE HI history me aayega (pehle server-clock
-boundary se bind tha, ab provider ke apne latest-closed signal se bhi fire
-hotа hai — dono me jo pehle). Reveal kabhi premature nahi hoga (safety clamp).
+v3 = v2 + 2 fixes:
+  A) BET SETTLEMENT AB TIMER-END PAR (My History me turant settle hona band)
+  B) BET-PANEL CSS GUARD (number balls / Random X1..X100 / game tabs ka
+     screen se katna fix)
 
-FILES AUR UNKE CPANEL TARGET PATH (3 files):
+FILES AUR UNKE CPANEL TARGET PATH (4 files):
 --------------------------------------------
-1) saas_lottery/bootstrap_live_v4.php   -> replace   (engine + lag + reveal gate)
-2) saas_lottery/config_live_v4.php      -> replace   (period_lag => 1)
-3) draw-live-v4/index.php               -> replace   (boundary-wait window widen:
-                                          timer ke aas-paas ki request hold ho
-                                          kar result ready hote hi deti hai)
+1) saas_lottery/bootstrap_live_v4.php
+   -> public_html/saas_lottery/bootstrap_live_v4.php  (replace)
+   Engine: 1-period lag, timer-end reveal gate, AUR ab settlement bhi isi
+   reveal-gate se chalta hai:
+   - Bet lagane par result chahe server ke paas aa chuka ho, bet PENDING
+     rahega jab tak screen par us period ka timer khatam nahi hota.
+   - Timer ke 0 hote hi: result history me + payout balance me — ek hi
+     request cycle me (upstream slow bhi ho to timer end par hi settle).
+   - period_lag=0 par ye gate = live behaviour (turant settle) — unchanged.
+2) saas_lottery/config_live_v4.php
+   -> public_html/saas_lottery/config_live_v4.php     (replace)
+   'period_lag' => 1  (0 = live, 2 = 2 period piche)
+3) draw-live-v4/index.php
+   -> public_html/draw-live-v4/index.php              (replace)
+   Boundary-wait window widened: timer ke aas-paas wali history request hold
+   hoti hai aur result ready hote hi wahi request jawab deti hai.
+4) assets/css/shreewin-wheel500-hotfix.css
+   -> public_html/assets/css/shreewin-wheel500-hotfix.css (replace; PURI file
+   — isme pehle se maujood wheel-hotfix rules bhi hain, isliye sirf append
+   mat karna, poori file hi copy karna)
+   Kya fix karta hai:
+   - html rem base = min(10vw, 40px) !important — poora game 10rem grid hai,
+     ye lock karta hai ki grid kabhi viewport se bada na ho. Browser zoom,
+     flexible.js miss hona, ya old shell — kis bhi wajah se balls row
+     (0-9), multiplier strip (Random X1 X5 X10 X20 X50 X100) aur game tabs
+   - .ramd chips ab wrap karte hain (bahut narrow phone ya bhaasha labels par
+     screen se bahar jaane ke bajaye agli line)
+   - .select tab strip ko symmetric padding — edge-clipping khatam
+   - Colors/skin/animation CSS ko chhua nahi — sirf sizing guard
 
-EXTRACT-READY ZIP:
-------------------
-shreewin-update.zip ke andar exactly wahi folder structure hai:
+ZIP EXTRACT (recommended):
+--------------------------
+shreewin-update.zip -> public_html me upload -> right-click -> Extract Now.
+Andar folder structure same hai, files apni jagah overwrite ho jayengi:
   saas_lottery/bootstrap_live_v4.php
   saas_lottery/config_live_v4.php
   draw-live-v4/index.php
-Ise public_html me upload karo -> right-click -> Extract Now.
-Files khud sahi folders me overwrite ho jayengi.
-(cPanel Extract overwrite karta hai; isliye pehle backup zaroor le lena.)
+  assets/css/shreewin-wheel500-hotfix.css
 
 STEPS:
 ------
-1. cPanel -> File Manager -> public_html jao.
-2. Backup: saas_lottery aur draw-live-v4 folders ka copy bana lo
-   (ya kam se kam in 3 files ka .bak).
-3. shreewin-update.zip upload karo -> public_html me hi Extract karo.
-4. Bas. DB nahi chhedna, cron nahi, frontend/assets untouched hain isliye
-   CSS/UI bilkul same rahega. Hard refresh (Ctrl+F5) karke test karo.
+1. cPanel -> File Manager -> public_html.
+2. Backup: saas_lottery, draw-live-v4, assets/css folders ka copy
+   (ya kam se kam in 4 files ke .bak).
+3. Zip upload -> public_html me Extract.
+4. Phone par site khol ke HARD refresh (ya app kill karke dobara).
+   Ctrl+F5 (browser) / app cache clear (WebView).
 
-VERIFY KARNE KA TICKET:
------------------------
-- Game kholo (WinGo 1M): on-screen period number = upstream se 1 piche. ✓
-- TIMER TEST (v2 ka main fix): jab countdown 0 ho, USI period ka result
-  TURANT history/list me top row ke roop me dikhna chahiye
-  (zyada se zyada ~2-5 sec, kyunki request boundary par hold hoti hai).
-- Result animation ke baad agli period ka number continue kare (no skips).
-- Trend page aur Records page bhi lagged history hi dikhayenge (consistent).
-- Test bet: bet accept hoga, period close hote hi settle (balance update).
+VERIFY TICKET:
+--------------
+[1] WinGo 1M: screen ka period number = upstream se 1 piche.        (v1)
+[2] Timer 0 hote hi usi period ka result history ke top par.          (v2)
+[3] (v3-naya) Timer chalraha hai: bet lagao -> My History me bet
+    'ongoing/pending' dikhe, balance na kate-juade jaise settle ho.
+    Timer end hote hi won/lost + balance update. Ek bhi bet hamesha
+    ke liye stuck nahi hona chahiye (max ~2-3 sec baad settle).
+[4] (v3-naya) 30sec game: number balls (0-9), Random/X1..X100 row aur
+    tabs screen ke andar; left/right kuch kata hua nahi.
+[5] K3 / 5D / TrxWinGo / MotoRace bhi khol ke dekh lo — sab par same
+    lag + settlement gate laga hai.
 
-CONTROL:
---------
-config_live_v4.php me:
-  'period_lag' => 1  -> 1 period piche (current setting)
-  'period_lag' => 0  -> wapas live (reveal behaviour bhi purana)
-  'period_lag' => 2  -> 2 period piche (30s games ke liye option)
+ROLLBACK / CONTROL:
+-------------------
+- Sirf settlement ya lag off karna ho: config_live_v4.php me
+  'period_lag' => 0. (CSS guard ko wapas laane ke liye .bak restore.)
+- Poora rollback: in 4 files ko apne .bak se replace kar do. DB ka koi
+  change nahi hai, data safe rahega.
 
-ROLLBACK:
----------
-saas_lottery_bak / draw-live-v4 wapas copy kar lo, ya in 3 files ko .bak se
-restore kar do. Koi DB change nahi hai to data safe rahega.
-
-Direct download (GitHub raw links):
+GitHub raw links (individual files):
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/shreewin-update.zip
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/saas_lottery-bootstrap_live_v4.php
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/saas_lottery-config_live_v4.php
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/draw-live-v4-index.php
+  https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/assets-css-shreewin-wheel500-hotfix.css

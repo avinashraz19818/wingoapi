@@ -1,0 +1,67 @@
+/* Shree Win wheel reward label — intentionally loaded after the theme CSS. */
+#app .tabbar__container-item .turntable-text {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 50%;
+    bottom: 0 !important;
+    transform: translateX(-50%);
+    width: 2.04rem !important;
+    height: 0.72rem !important;
+    padding: 0.16rem 0.04rem 0.04rem;
+    box-sizing: border-box;
+    overflow: visible !important;
+    z-index: 4 !important;
+    background: #ffffff !important;
+    color: var(--main-color, #6c4cff) !important;
+    font-size: 0.4rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* ---- ShreeWin bet-layout guard (v3) ---------------------------------- */
+/* The WinGo-family panels are laid out on a 10rem grid that must equal the
+   viewport width. When the rem base drifts above viewport/10 (browser zoom,
+   missing flexible init, old shell), the number balls, the Random X1..X100
+   strip and the game tabs overflow the screen edges and get clipped.
+   Lock the base so 10rem is never wider than the viewport; above 400px the
+   original 40px desktop base is preserved. */
+html{
+    font-size: min(10vw, 40px) !important;
+}
+#app{
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+/* If any full-bleed strip still reaches the edges, keep it readable instead
+   of cutting labels off: small symmetric padding wins over clipping. */
+#app .select{
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: .32rem;
+    padding-right: .32rem;
+    box-sizing: border-box;
+}
+/* Multiplier chips wrap onto a second line on very narrow screens (or with
+   long language labels) rather than being pushed off-screen; Big/Small and
+   the ball rows are untouched. */
+#app .bet_body .ramd{
+    flex-wrap: wrap;
+    height: auto !important;
+    min-height: .90667rem;
+    row-gap: .13333rem;
+}
+#app .bet_body .ramd .r{
+    flex: 0 0 auto;
+    padding: 0 .13333rem;
+    box-sizing: border-box;
+}
+/* Number balls: keep rows centered with breathing room if the panel is
+   narrower than the classic 10rem grid. */
+#app .bet_body .betNum{
+    box-sizing: border-box;
+    max-width: 100%;
+}
