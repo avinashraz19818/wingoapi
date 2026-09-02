@@ -70,16 +70,22 @@ class LotteryController
      * result would be filtered out. Bump any stale value up to the real open
      * round so the latest result is always served.
      */
-    private function effectiveActiveIssue(GameDefinition $game): string
+    private function effectiveActiveIssue(GameDefinition $game, ?int $now = null): string
     {
-        $current = (string) $this->app->scheduler()->current($game)->issueNumber;
+        $now ??= Clock::now();
+        $current = (string) $this->app->scheduler()->current($game, $now)->issueNumber;
         $active  = trim((string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? ''));
 
         if ($active === '' || !IssueNumber::isValid($active) || !IssueNumber::belongsTo($active, $game)) {
             return $current;
         }
 
-        return strcmp($active, $current) < 0 ? $current : $active;
+        $clientNext = (string) $this->app->scheduler()->next(
+            $game,
+            $this->app->scheduler()->fromIssueNumber($game, $active)->startTs
+        )->issueNumber;
+
+        return strcmp($clientNext, $current) < 0 ? $current : $clientNext;
     }
 
     /* ===================================================================
@@ -395,9 +401,12 @@ class LotteryController
         $pageSize = Validator::int($this->input, 'pageSize', 10, 1, 100);
 
         // Make sure everything that has finished is drawn before we page over it.
-        $this->app->settlement()->settleDue($game, min(20, $pageSize + 5));
+        // Look one second ahead so clients polling at the countdown boundary get
+        // the just-finished round without a manual refresh.
+        $now = Clock::now() + 1;
+        $this->app->settlement()->settleDue($game, min(20, $pageSize + 5), $now);
 
-        $activeIssue = $this->effectiveActiveIssue($game);
+        $activeIssue = $this->effectiveActiveIssue($game, $now);
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -417,9 +426,10 @@ class LotteryController
         $game   = $this->game();
         $window = Validator::int($this->input, 'window', 100, 10, 500);
 
-        $this->app->settlement()->settleDue($game, 5);
+        $now = Clock::now() + 1;
+        $this->app->settlement()->settleDue($game, 5, $now);
 
-        $activeIssue = $this->effectiveActiveIssue($game);
+        $activeIssue = $this->effectiveActiveIssue($game, $now);
         return $this->app->trends()->statistics($game, $window, $activeIssue);
     }
 

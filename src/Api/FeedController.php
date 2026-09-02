@@ -71,9 +71,12 @@ class FeedController
         $pageSize = Validator::int($this->input, 'pageSize', 10, 1, 100);
 
         // Make sure everything that has finished is drawn before we serve it.
-        $this->app->settlement()->settleDue($game, min(20, $pageSize + 5));
+        // Look one second ahead so a client that polls at the countdown-boundary
+        // (and is slightly ahead of our clock) gets the result immediately.
+        $now = Clock::now() + 1;
+        $this->app->settlement()->settleDue($game, min(20, $pageSize + 5), $now);
 
-        $activeIssue = $this->effectiveActiveIssue($game);
+        $activeIssue = $this->effectiveActiveIssue($game, $now);
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -143,16 +146,22 @@ class FeedController
      * Bumps a stale/lagging client-supplied activeIssue up to the real open
      * round so the round that just finished is always included.
      */
-    private function effectiveActiveIssue(GameDefinition $game): string
+    private function effectiveActiveIssue(GameDefinition $game, ?int $now = null): string
     {
-        $current = (string) $this->app->scheduler()->current($game)->issueNumber;
+        $now ??= Clock::now();
+        $current = (string) $this->app->scheduler()->current($game, $now)->issueNumber;
         $active  = trim((string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? ''));
 
         if ($active === '' || !IssueNumber::isValid($active) || !IssueNumber::belongsTo($active, $game)) {
             return $current;
         }
 
-        return strcmp($active, $current) < 0 ? $current : $active;
+        $clientNext = (string) $this->app->scheduler()->next(
+            $game,
+            $this->app->scheduler()->fromIssueNumber($game, $active)->startTs
+        )->issueNumber;
+
+        return strcmp($clientNext, $current) < 0 ? $current : $clientNext;
     }
 
     /** One specific round. */

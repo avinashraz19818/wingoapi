@@ -29,6 +29,15 @@ class ArCompatController
     /** @var array<int,string> games this site may show (empty = all) */
     private array $allowedGames;
 
+    /**
+     * AR clients poll history on the exact tick their countdown hits zero. Their
+     * clock can be a little ahead of ours, so when computing the round that
+     * "just finished" we look a short window ahead of the server clock. This
+     * makes the latest result appear on the same request instead of after a
+     * manual refresh.
+     */
+    private const HISTORY_END_GRACE_SECONDS = 1;
+
     public function __construct(App $app, array $input, ?array $user = null, array $allowedGames = [])
     {
         $this->app          = $app;
@@ -349,13 +358,20 @@ class ArCompatController
         $pageNo   = Validator::int($this->input, 'pageNo', 1, 1, 1000);
         $pageSize = Validator::int($this->input, 'pageSize', 10, 1, 100);
 
-        $this->app->settlement()->settleDue($game, min(20, $pageSize + 5));
+        // Look one second ahead of the server clock. AR clients fire their
+        // history request the instant their countdown reaches zero, slightly
+        // before our clock crosses the period boundary.
+        $now = Clock::now();
+        $historyNow = $now + self::HISTORY_END_GRACE_SECONDS;
 
-        // These AR-style clients already run one period behind the real clock
-        // (issueData uses now - interval). The issue sent/known as "current" is
-        // the round that must be hidden from history, so we filter strictly
-        // below it. This keeps the top period out of the Game History table.
-        $activeIssue = $this->clientActiveIssue($game);
+        $this->app->settlement()->settleDue($game, min(20, $pageSize + 5), $historyNow);
+
+        // AR-style clients intentionally show the previous round as "current"
+        // (issueData uses now - interval). That "current" round is the newest
+        // finished result, so history must include it and be exactly one period
+        // behind the real open round. We therefore serve up to the actual open
+        // round (the same issue number the timer will advance to).
+        $activeIssue = $this->effectiveActiveIssue($game, $historyNow);
         $rows  = $this->app->draws()->history($game, $pageSize, ($pageNo - 1) * $pageSize, $activeIssue);
         $total = $this->app->draws()->countHistory($game, $activeIssue);
 
@@ -397,22 +413,27 @@ class ArCompatController
      * Active issue upper-bound for AR history/trend queries.
      *
      * AR-style clients intentionally show the previous round as "current"
-     * (issueData uses now - interval). History must therefore be strictly
-     * below the issue the client is displaying — never include that period.
-     * When the client does not send one, we default to that same lagged round.
+     * (issueData uses now - interval). That displayed round is the newest
+     * finished result and must be the first history row. History is therefore
+     * served up to the issue *after* the client's displayed round — i.e. the
+     * real open round whose countdown is running. Any stale/lagging
+     * client-supplied issue is always bumped forward.
      */
-    private function clientActiveIssue(GameDefinition $game): string
+    private function effectiveActiveIssue(GameDefinition $game, int $now): string
     {
-        $active = trim((string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? ''));
+        $current = (string) $this->app->scheduler()->current($game, $now)->issueNumber;
+        $active  = trim((string) ($this->input['activeIssue'] ?? $this->input['active_issue'] ?? ''));
 
-        if ($active !== '' && IssueNumber::isValid($active) && IssueNumber::belongsTo($active, $game)) {
-            return $active;
+        if ($active === '' || !IssueNumber::isValid($active) || !IssueNumber::belongsTo($active, $game)) {
+            return $current;
         }
 
-        return (string) $this->app->scheduler()->issueAt(
+        $clientNext = (string) $this->app->scheduler()->next(
             $game,
-            Clock::now() - $game->seconds
+            $this->app->scheduler()->fromIssueNumber($game, $active)->startTs
         )->issueNumber;
+
+        return strcmp($clientNext, $current) < 0 ? $current : $clientNext;
     }
 
     /** GetWinTheLotteryResult / GetResult */
@@ -462,7 +483,8 @@ class ArCompatController
             $stats[(string) $digit] = ['appear' => 0, 'missing' => 0, 'maxContinuous' => 0];
         }
 
-        $activeIssue = $this->clientActiveIssue($game);
+        $historyNow = Clock::now() + self::HISTORY_END_GRACE_SECONDS;
+        $activeIssue = $this->effectiveActiveIssue($game, $historyNow);
         $engine = $this->app->trends()->statistics($game, 100, $activeIssue);
         foreach ($engine['positions']['number'] ?? [] as $row) {
             $value = (string) $row['value'];
