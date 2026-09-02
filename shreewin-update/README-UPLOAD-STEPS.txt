@@ -35,8 +35,14 @@ VERIFY:
 
 ZIP (ek saath download ke liye):
 --------------------------------
-shreewin-period-lag-update.zip me same dono files hain.
+shreewin-update.zip me same dono files hain.
 
 GitHub direct download links (browser me khol ke Ctrl+S se save karo):
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/bootstrap_live_v4.php
   https://github.com/avinashraz19818/wingoapi/raw/arena/01a06254-wingoapi/shreewin-update/config_live_v4.php
+
+EXTRACT-READY ZIP (recommended):
+  shreewin-update.zip ke andar saas_lottery/ folder hai.
+  Ise public_html me upload karo -> right-click -> Extract Now.
+  Dono files khud saas_lottery/ me jaake overwrite ho jayengi.
+  (cPanel Extract overwrite karta hai; isliye pehle backup zaroor le lena.)
