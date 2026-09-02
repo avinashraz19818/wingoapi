@@ -90,3 +90,9 @@ won/lost + amount return karega. Popup ab clock-skew se unaffected aayega.
 v5 CHANGE: WinLoss popup diagnostics — config_live_v4.php me naya key
 'winloss_debug' => true (false karne par logging off). Har popup-query
 ki entry log hoti hai: saas_lottery/logs/winloss.log (file khud ban jayegi).
+
+v6 = v5 ka CRITICAL 500 fix: save-loop me undefined function call (purana
+sl_settlement_allowed) fatale kar rahi thi -> results refresh-refresh ke baad
+aa rahe the AUR GetWinLossResult 500 de raha tha (popup isliye nahi aaya).
+Ab gate same batch wale; popup endpoint try/catch-protected (kabhi 500 nahi).
+Sirf saas_lottery/bootstrap_live_v4.php replace karna hai.

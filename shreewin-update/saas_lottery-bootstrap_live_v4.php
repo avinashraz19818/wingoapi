@@ -1322,7 +1322,7 @@ function sl_save_and_settle_results($gameCode, $list)
             sl_admin_override_mark_applied($conn, $gameCode, $issue);
         }
 
-        if (!empty($pending[$issue]) && sl_settlement_allowed($gameCode, $issue)) {
+        if (!empty($pending[$issue]) && ($settleGate === '' || strcmp($issue, $settleGate) < 0)) {
             sl_settle_issue($gameCode, $issue, $item);
         }
     }
@@ -2156,21 +2156,36 @@ function sl_win_loss($userId, $input)
     // countdown instead of delaying it by network/clock skew.
     $forced = 0;
     if ((int) $total > 0 && (int) $pending > 0 && $gameCode !== '') {
-        $res = $conn->prepare('SELECT premium FROM saas_lottery_results WHERE game_code=? AND issue_number=? LIMIT 1');
-        $res->bind_param('ss', $gameCode, $issue);
-        $res->execute();
-        $res->bind_result($storedPremium);
-        $hasResult = $res->fetch();
-        $res->close();
-        if ($hasResult && $storedPremium !== null) {
-            $item = sl_normalize_result_item($gameCode, array(
-                'issueNumber' => (string) $issue,
-                'premium' => (string) $storedPremium,
-            ));
-            if ($item) {
-                sl_settle_issue($gameCode, (string) $issue, $item);
-                $forced = 1;
-                $again = $conn->prepare("SELECT COUNT(*),SUM(status='pending'),SUM(status='won'),COALESCE(SUM(payout),0) FROM saas_lottery_bets WHERE user_id=? AND issue_number=?");
+        try {
+            $res = $conn->prepare('SELECT premium, number, color, result_sum FROM saas_lottery_results WHERE game_code=? AND issue_number=? LIMIT 1');
+            if ($res) {
+                $res->bind_param('ss', $gameCode, $issue);
+                $res->execute();
+                $storedPremium = $storedNumber = $storedColor = null;
+                $storedSum = 0;
+                $res->bind_result($storedPremium, $storedNumber, $storedColor, $storedSum);
+                $hasResult = $res->fetch();
+                $res->close();
+                if ($hasResult && $storedPremium !== null) {
+                    $item = sl_normalize_result_item($gameCode, array(
+                        'issueNumber' => (string) $issue,
+                        'premium' => (string) $storedPremium,
+                        'number' => (string) $storedNumber,
+                        'color' => (string) $storedColor,
+                        'sum' => (int) $storedSum,
+                    ));
+                    if ($item) {
+                        sl_settle_issue($gameCode, (string) $issue, $item);
+                        $forced = 1;
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[saas-lottery winloss force-settle] ' . $e->getMessage());
+        }
+        if ($forced || (int) $pending > 0) {
+            $again = $conn->prepare("SELECT COUNT(*),SUM(status='pending'),SUM(status='won'),COALESCE(SUM(payout),0) FROM saas_lottery_bets WHERE user_id=? AND issue_number=?");
+            if ($again) {
                 $again->bind_param('is', $userId, $issue);
                 $again->execute();
                 $again->bind_result($total, $pending, $won, $winAmount);
