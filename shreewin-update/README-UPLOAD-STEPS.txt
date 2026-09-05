@@ -112,3 +112,5 @@ v9 (UI): 1) Bottom tab ka "Get ₹500" ab reference-jaisa — solid gold text,
    3) index.html me ?v=20260902-home-v5 (purani cached css/js force-reload).
    ZIP me 3 naye files: index.html, assets/css/shreewin-wheel500-hotfix.css,
    assets/js/shreewin-wheel500-hotfix.js. PHP files wahi (koi change nahi).
+
+v10: FOLLOW STRATEGY hataya gaya — api-live-v4/Lottery/index.php me GetUserInfo ab isOpenFollow:false. App restart par Follow Strategy tab gayab. ZIP me naya path: api-live-v4/Lottery/index.php.
