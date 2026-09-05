@@ -114,3 +114,8 @@ v9 (UI): 1) Bottom tab ka "Get ₹500" ab reference-jaisa — solid gold text,
    assets/js/shreewin-wheel500-hotfix.js. PHP files wahi (koi change nahi).
 
 v10: FOLLOW STRATEGY hataya gaya — api-live-v4/Lottery/index.php me GetUserInfo ab isOpenFollow:false. App restart par Follow Strategy tab gayab. ZIP me naya path: api-live-v4/Lottery/index.php.
+
+v11: My History me period ke neeche jo bet ka time dikhta hai, ab wo bhi
+1 period PICHE dikhega (bet 16:08:30 par laga -> dikhayega 16:07:30; 30s game
+par -30s). Ye sirf display shift hai - DB, payout, settlement real time me.
+Sirf saas_lottery/bootstrap_live_v4.php badli (size 106,872B ke aas-paas).

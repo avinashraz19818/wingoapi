@@ -2110,16 +2110,28 @@ function sl_record_page($userId, $input)
         // `premium`. Return both the current and legacy aliases so every game
         // record view can render the same settled row.
         $recordNumber = ($premium !== '' && ($isWingo || $recordFamily === 'K3')) ? $premium : '';
+        // The displayed issue runs one (or more) periods behind the upstream
+        // clock, so the timestamp shown under it must shift by the same amount
+        // or every record reads as if it was bet a period too late. This is
+        // presentation-only: DB rows, settlement and audit stay real-time.
+        $displayTime = (string) $row['created_at'];
+        $lagShiftSeconds = sl_period_lag_periods() > 0 ? sl_period_lag_periods() * sl_interval_seconds((string) $row['game_code']) : 0;
+        if ($lagShiftSeconds > 0 && $displayTime !== '') {
+            $shiftTs = strtotime($displayTime);
+            if ($shiftTs !== false) {
+                $displayTime = date('Y-m-d H:i:s', $shiftTs - $lagShiftSeconds);
+            }
+        }
         $list[] = array(
             'orderNo'=>(string)$row['id'],'issueNumber'=>(string)$row['issue_number'],'gameCode'=>(string)$row['game_code'],
             'betContent'=>(string)$row['bet_content'],'playType'=>$playType,'selectType'=>$selectType,
             'amount'=>$stake,'unitAmount'=>(float)$row['amount'],'betMultiple'=>(int)$row['bet_multiple'],'betCount'=>(int)$row['bet_multiple'],
             'betUnits'=>(int)$row['bet_units'],'realAmount'=>max(0.0, round($stake-$taxFee,4)),'fee'=>$taxFee,'serviceCharge'=>$taxFee,'tax'=>$taxFee,'taxAmount'=>$taxFee,'taxRate'=>sl_tax_percent(),'state'=>$state,'premium'=>$premium,
-            'winLoseAmount'=>$winLose,'betTime'=>(string)$row['created_at'],'orderNumber'=>(string)$row['id'],
+            'winLoseAmount'=>$winLose,'betTime'=>$displayTime,'orderNumber'=>(string)$row['id'],
             'betAmount'=>$stake,'number'=>$recordNumber,'resultNumber'=>$isWingo && $premium !== '' ? (int)$premium : null,
             'color'=>$isWingo && $premium !== '' ? sl_result_color((int)$premium) : '',
             'winAmount'=>$payout,'profitAmount'=>$state === 2 ? 0.0 : abs($winLose),
-            'createTime'=>(string)$row['created_at'],'addTime'=>(string)$row['created_at']
+            'createTime'=>$displayTime,'addTime'=>$displayTime
         );
     }
     $stmt->close();
