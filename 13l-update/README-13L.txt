@@ -1,4 +1,4 @@
-13L555 FINAL PACKAGE (v4) — SAB SETUP KHUD
+13L555 FINAL PACKAGE (v5) — SAB SETUP KHUD
 =============================================
 Ab tumhe sirf 2 kaam karne hain. Bas. Koi file edit nahi karni —
 bridge (official AR draw feed) aur tax sab andar se configured hai.
@@ -53,3 +53,13 @@ FILES BADLI HAIN (size se check kar lo, public_html ke andar)
   users, wallet, bets, config (DB) — KUCH nahi chheda.
   Sab wapas purana chahiye: bas api/_core/bridge.php delete kar do → game
   apne local draw par aa jayega (periods phir bhi same numbering par).
+
+V5 UPDATE — AGAR SETUP NE "ok": false DIYA THA (feed host se nahi mila):
+  Isi zip ko extract karne ke baad ye ek link kholo — sab AUTOMATIC theek ho
+  jayega (khud try karega: (a) official AR feed browser-headers ke saath,
+  (b) agar wo fail ho to DhaniWin site ke database se uska provider API URL
+  dhundh ke usse connect karega):
+  https://13.club9.eu.cc/13l-fixfeed.php?key=13l2026
+  "ok": true aaye to game refresh karke dekho — result ab reference se match.
+  Dono fail ho to is JSON ka screenshot bhej do (host outbound blocks kar
+  raha hai — hosting se "allow outgoing HTTPS" bolwana padega).
