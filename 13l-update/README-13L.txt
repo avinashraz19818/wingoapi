@@ -41,7 +41,7 @@ VERIFY (30 second)
 FILES BADLI HAIN (size se check kar lo, public_html ke andar)
   13l-setup.php                    2,719B  (ek-baar chalao, khud delete)
   api/_core/lottery_bridge.php     6,566B  (naya — official feed)
-  api/_core/bridge.php                 374B  (naya — configured, chhune ki zaroorat nahi)
+  api/_core/bridge.php ZIP ME NAHI hai — jo config server par bani hai wahi safe rahegi)
   api/_core/bootstrap.php         90,029B
   api/_core/lottery_engine.php    25,024B
   api/_router.php                178,475B
