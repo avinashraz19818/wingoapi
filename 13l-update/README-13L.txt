@@ -86,3 +86,12 @@ V7 — MY-HISTORY FLICKER + PURANE-GALAT-BETS REPAIR:
   https://13l.club9.eu.cc/13l-repair.php?key=13l2026
   (ek baar kholo; "bets_repaired": N dikhe; wallet ka farak auto-adjust +
   statement me 'Settle repair' entry; file khud delete.)
+
+V9 — ROOT CAUSE FIXED (BigSmall bet ULTA settle hona):
+  Bet-content parser "BigSmall_Big" me "Small" word dhoondh leta tha — isliye
+  har BIG bet chhupke SMALL ban jaata tha (jeeta hua bet "Lose" dikhta tha).
+  Structured parse add: BigSmall_Big / Color_green / Num_5 / Sum_10 ab EXACT
+  parse hote hain, loose fallback sirf anokhe formats ke liye.
+  Purane ulte-settle bets + wallet theek karne ke liye EK BAAR:
+  https://13l.club9.eu.cc/13l-repair2.php?key=13l2026
+  (bets_checked / bets_fixed / fix_details dikhega — screenshot bhejo)
