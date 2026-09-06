@@ -41,7 +41,7 @@ VERIFY (30 second)
 FILES BADLI HAIN (size se check kar lo, public_html ke andar)
   13l-setup.php                    2,719B  (ek-baar chalao, khud delete)
   api/_core/lottery_bridge.php     6,566B  (naya — official feed)
-  api/_core/bridge.php ZIP ME NAHI hai — jo config server par bani hai wahi safe rahegi)
+  api/_core/bridge.php                 374B  (naya — configured, chhune ki zaroorat nahi)
   api/_core/bootstrap.php         90,029B
   api/_core/lottery_engine.php    25,024B
   api/_router.php                178,475B
@@ -76,3 +76,13 @@ V6 UPDATE — SETTLE/RESULT CONSISTENCY FIX:
   NOTE: jo bets v6 se PEHLE galat settle ho chuke hain (jaise demo test ke
   -10,000/+44,200 wale), unke records waise hi rahenge — ab se naye bets
   hamesha official result se hi settle honge.
+
+V7 — MY-HISTORY FLICKER + PURANE-GALAT-BETS REPAIR:
+  Fix 1: Saare API/JSON responses par ab no-store headers — browser purana
+  history 1 second dikhake wapas nahi karega (yehi "1 sec sahi, phad purana"
+  bug tha).
+  Fix 2: Jo bets pehle GALAT result par settle ho chuke the, unhe official
+  result se dobara calculate karke THEEK karne wala repair script:
+  https://13l.club9.eu.cc/13l-repair.php?key=13l2026
+  (ek baar kholo; "bets_repaired": N dikhe; wallet ka farak auto-adjust +
+  statement me 'Settle repair' entry; file khud delete.)
