@@ -95,3 +95,13 @@ V9 — ROOT CAUSE FIXED (BigSmall bet ULTA settle hona):
   Purane ulte-settle bets + wallet theek karne ke liye EK BAAR:
   https://13l.club9.eu.cc/13l-repair2.php?key=13l2026
   (bets_checked / bets_fixed / fix_details dikhega — screenshot bhejo)
+
+V10 — FINAL: SELF-HEALING (koi script chalane ki zaroorat NAHI):
+  1) Parser fix (v9) ke saath naye bets 100% sahi settle.
+  2) le_autorepair(): game page ke har poll par (zyada se zyada 10 min me ek baar)
+     server khud: pending settle + pichle 7 din ke saare settled bets ko OFFICIAL
+     result se recalculate, galat state/amount + wallet + statement theek.
+  3) History row aur result-popup ab RESPONSE me bhi turant sudhar jate hain
+     (display self-correction), DB repair ka intezaar nahi.
+  Zip extract karo = bas. Verify: 13l-doctor.php me "has_choice_fix"/
+  "has_autorepair": yes + "autorepair":{last_run, fixed} dikhna chahiye.
