@@ -8,7 +8,7 @@ STEP 1 — EXTRACT
   → "overwrite/replace" puche to OK/Replace.
 
 STEP 2 — EK LINK KHOLO (browser me)
-  https://13l555.com/13l-setup.php?key=13l2026
+  https://13.club9.eu.cc/13l-setup.php?key=13l2026
 
   Ye link khud karega:
    - purane (local formula wale) results DB se hata dega
