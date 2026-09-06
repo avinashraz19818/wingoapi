@@ -36,6 +36,24 @@ JO PEHLE SE SAHI THA (chheda nahi):
   ✓ Multiplier row X1 X5 X10 X20 X50 X100 (betMultiples sahi tha)
   ✓ Pending bet state (state=2, result ke baad settle)
 
+SHARED DETERMINISTIC ENGINE (is version ka main fix):
+  13l ka result pehle APNA random (random_int) tha — isliye DhaniWin ke
+  results se alag chal raha tha. Ab 13l me DhaniWin engine ka EXACT algorithm
+  copy ho gaya hai:
+    issue number = YYYYMMDD(UTC) + game prefix + 4-digit period index
+                   (WinGo_30S=10005, WinGo_1M=10001, 3M=10002, 5M=10003,
+                    TrxWinGo=2000x, 5D/D5=3000x, K3=4000x, Moto=50001)
+    result       = crc32("gameCode:issueNumber") % 10  (WinGo)
+    (K3/D5/Moto ke liye bhi wahi seed-based formulas, 13l ke format me)
+  Matlab: same period = same issue number = same result, DONO sites par.
+  Koi external API/bridge nahi — algorithm copy hai, isliye DhaniWin down ho
+  to bhi 13l chalega aur numbers phir bhi match karenge.
+  Notes:
+  - Deploy se pehle ke jo purane results DB me save hain wo waise hi rahenge
+    (donon sites DB-row ko priority deti hain); naye period se 100% match.
+  - Admin ka force_result setting dono jaga override karta hai — use mat karo
+    agar match chahiye.
+
 STEPS:
 ------
 1. cPanel → File Manager → public_html
