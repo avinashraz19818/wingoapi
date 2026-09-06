@@ -63,3 +63,16 @@ V5 UPDATE — AGAR SETUP NE "ok": false DIYA THA (feed host se nahi mila):
   "ok": true aaye to game refresh karke dekho — result ab reference se match.
   Dono fail ho to is JSON ka screenshot bhej do (host outbound blocks kar
   raha hai — hosting se "allow outgoing HTTPS" bolwana padega).
+
+V6 UPDATE — SETTLE/RESULT CONSISTENCY FIX:
+  (1) Ab local fallback result DB me save NAHI hota jab feed on hai — isliye
+      kisi period ka "jaldi-bana" result history/settle ko bigad nahi sakta.
+  (2) Feed sync ab purani galat rows ko BHI theek karta hai (ON DUPLICATE
+      UPDATE) — deploy ke ~1 minute me purani rows official results se
+      auto-correct ho jayengi (Game history gayab/blank wali shikayat ka ye
+      ilaaj hai; rows 15-sec cache ke andar fix dikhne lagenge).
+  (3) Popup ka early settle ab sirf tab chalega jab OFFICIAL result row pehle
+      se maujood ho — isse "Win/Lose galat mark" wali race khatam.
+  NOTE: jo bets v6 se PEHLE galat settle ho chuke hain (jaise demo test ke
+  -10,000/+44,200 wale), unke records waise hi rahenge — ab se naye bets
+  hamesha official result se hi settle honge.
