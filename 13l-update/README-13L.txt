@@ -105,3 +105,23 @@ V10 — FINAL: SELF-HEALING (koi script chalane ki zaroorat NAHI):
      (display self-correction), DB repair ka intezaar nahi.
   Zip extract karo = bas. Verify: 13l-doctor.php me "has_choice_fix"/
   "has_autorepair": yes + "autorepair":{last_run, fixed} dikhna chahiye.
+
+V11 — MY-HISTORY FINAL FIX (self-heal guaranteed + ek-file self-deploy):
+  Kyu ab tak "same" lag raha tha:
+   a) autorepair lottery_issue() se juda tha = sirf NAYA BET lagane par chalta
+      tha; doctor me saaf dikha "abhi tak nahi chala".
+   b) Purane periods (2304/2305/1148/862) ki lottery_results row hi feed se
+      backfill nahi hui thi, to repair JOIN unhe skip kar deta tha.
+  Fix:
+   a) le_autorepair() ab HAR API request par gate hai (router entry) —
+      app/history/login/kuch bhi kholo, 10 min me ek baar repair pakka chalega.
+   b) Repair pehle users ki games ka feed (100 rows/game) lottery_results me
+      backfill karta hai, phir LEFT JOIN: official row mile to wahi, warna BET
+      par saved premium (history me dikh number) se Win/Lose recalculate +
+      wallet/statement fix.
+   c) 13l-deploy.php — zip extract karne ki zaroorat khatam: sirf ye EK file
+      public_html me dalo, phir link kholo:
+        https://13l.club9.eu.cc/13l-deploy.php?key=13l2026
+      Ye khud GitHub se latest zip download karega, backup banayega,
+      config.php/bridge.php ko chhue bina files update karega, aur TURANT
+      backfill+repair chala ke report dega. Idempotent — jitni baar chaho.
