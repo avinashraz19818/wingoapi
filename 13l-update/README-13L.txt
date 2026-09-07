@@ -160,3 +160,9 @@ V13 — MY HISTORY = PURI HISTORY (frontend issue ka asli fix):
   gameCode filter IGNORE karta hai — user ki saari bets (sab games) ek list
   me, latest first. Win/Lose badges phle se hi sahi hain.
   Verify: API me totalCount = user ke saare bets (9), rows me 1M bhi.
+
+V13.1 — HISTORY WIN AMOUNT EXACT:
+  Skin "+jeeta" dikhata hai realAmount+fee+winLose se. realAmount ab
+  stake-FEE (post-tax) jaata hai → +₹1,960 (jo sach me credit hua),
+  pehle +₹1,980 (fee double-count) dikh raha tha. DB/wallet/popup untouched
+  — sirf display. Verify: 52327 Big = +1,960 ; 52305 Big = +19,600.
