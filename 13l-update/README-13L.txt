@@ -152,3 +152,11 @@ V11.3 — deploy me CDN cache-buster (?ts=) + doctor 'has_bridge_fix' marker.
   (Server state 07:30 IST: saari 9 bets official results se CONSISTENT,
    autorepair live, watermark fixed:0 = converged. Baaki sirf v11.2 bridge
    fix pending hai — GitHub CDN ~10 min baar fresh zip deta hai.)
+
+V13 — MY HISTORY = PURI HISTORY (frontend issue ka asli fix):
+  Skin ka MyGameRecord page server se hamesa SIRF current game ki bets mangta
+  tha (gameCode filter) — user ne WinGo_30S + WinGo_1M dono kheli thi, isliye
+  "sara history nahi dikh raha" tha. Server-side fix: handle_lottery_record ab
+  gameCode filter IGNORE karta hai — user ki saari bets (sab games) ek list
+  me, latest first. Win/Lose badges phle se hi sahi hain.
+  Verify: API me totalCount = user ke saare bets (9), rows me 1M bhi.
