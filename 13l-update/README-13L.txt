@@ -147,3 +147,8 @@ V11.2 — FEED BACKFIX KA GUPT BLOCKER HATA (bridge bind_param):
   lagti thi.) Ab open_time issue-number se derive karke bind hota hai,
   types = ssssssii. Lint OK.
   User action: 13l-deploy.php ka link ek baar phir kholo — bas.
+
+V11.3 — deploy me CDN cache-buster (?ts=) + doctor 'has_bridge_fix' marker.
+  (Server state 07:30 IST: saari 9 bets official results se CONSISTENT,
+   autorepair live, watermark fixed:0 = converged. Baaki sirf v11.2 bridge
+   fix pending hai — GitHub CDN ~10 min baar fresh zip deta hai.)
