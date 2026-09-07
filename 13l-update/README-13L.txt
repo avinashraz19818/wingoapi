@@ -125,3 +125,16 @@ V11 — MY-HISTORY FINAL FIX (self-heal guaranteed + ek-file self-deploy):
       Ye khud GitHub se latest zip download karega, backup banayega,
       config.php/bridge.php ko chhue bina files update karega, aur TURANT
       backfill+repair chala ke report dega. Idempotent — jitni baar chaho.
+
+V11.1 — DEPLOY/REPAIR ROBUST (07:21 ke 500 ka asli matlab):
+  500 isliye aaya kyunki deploy ke andar ka repair 30-sec PHP timeout me
+  kat gaya — lekin usse PEHLE jo flips ho chuke the wo DB me save ho gaye:
+  doctor ne khud dikha 2305=WIN +9600, 2304=LOSE -1000, 1148=WIN +3840,
+  2327=WIN +960 — MATLAB MY HISTORY AB SAHI HAI. Bachi sirf legacy 1-rs
+  demo bet 862 (uska koi official result feed me nahi — ab bet ke saved
+  number se fallback se wo bhi fix hoti hai).
+  Changes: le_autorepair/repair2/deploy me set_time_limit(0) + ignore_user_abort;
+  lockfile ab host ke /tmp ke alawa site folders me bhi try karta hai;
+  deploy har step print karta hai (blank 500 nahi aayega); repair2 v11.1 =
+  backfill + no-gate full recalc + wallet + statement.
+  Ek step: 13l-deploy.php link khol (jo bhi output aaye theek), phir app khol.
