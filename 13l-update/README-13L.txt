@@ -138,3 +138,12 @@ V11.1 — DEPLOY/REPAIR ROBUST (07:21 ke 500 ka asli matlab):
   deploy har step print karta hai (blank 500 nahi aayega); repair2 v11.1 =
   backfill + no-gate full recalc + wallet + statement.
   Ek step: 13l-deploy.php link khol (jo bhi output aaye theek), phir app khol.
+
+V11.2 — FEED BACKFIX KA GUPT BLOCKER HATA (bridge bind_param):
+  lottery_bridge lb_sync me INSERT 8 placeholder + NOW() tha par sirf 7
+  variables bind ho rahe the (open_time miss) → MySQL har feed row REJECT
+  kar deta tha → feed backfill v6 se silently ZERO hi save kar raha tha!
+  (Isiliye purane periods ki result rows missing thi aur repairs adhuri
+  lagti thi.) Ab open_time issue-number se derive karke bind hota hai,
+  types = ssssssii. Lint OK.
+  User action: 13l-deploy.php ka link ek baar phir kholo — bas.
