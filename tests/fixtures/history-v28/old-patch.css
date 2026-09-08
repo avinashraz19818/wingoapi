@@ -1,0 +1,6 @@
+/* 13L-PATCH25: history readability, standalone fresh file */
+.my_r-body .list,.MyGameRecord__C-body .list{height:auto!important;max-height:none!important;overflow:visible!important}
+.my_r-body .list-item,.MyGameRecord__C-body .list-item{overflow:visible!important}
+.my_r-body .list-item-m-top,.MyGameRecord__C-body .list-item-m-top{color:#fff!important;overflow:visible!important}
+.my_r-body .list-item-m-bottom,.MyGameRecord__C-body .list-item-m-bottom{color:#9a9a9a!important;overflow:visible!important}
+.my_r-body .list-item-l,.MyGameRecord__C-body .list-item-l{overflow:visible!important}

@@ -1,0 +1,345 @@
+.t[data-v-6f1c18a2] {
+    width: 100%;
+    text-align: center;
+    font-size: .32rem;
+    padding: 0 0 .32rem
+}
+
+.t .t_head[data-v-6f1c18a2] {
+    height: 1.06667rem;
+    line-height: 1.06667rem;
+    font-weight: 700;
+    font-size: .34667rem;
+    color: #fff;
+    border-radius: .13333rem .13333rem 0 0;
+    background: var(--sheet_nva_color)
+}
+
+.t .t_head div[data-v-6f1c18a2]:nth-child(1) {
+    width: 30%;
+    display: inline-block;
+    text-align: center
+}
+
+.t .t_head div[data-v-6f1c18a2]:nth-child(2) {
+    width: 70%;
+    display: inline-block;
+    text-align: center
+}
+
+.t-head[data-v-6f1c18a2] {
+    height: 1.06667rem;
+    line-height: 1.06667rem;
+    background: var(--sheet_nva_color);
+    border-radius: .13333rem .13333rem 0 0;
+    font-weight: 700;
+    font-size: .34667rem;
+    color: #fff
+}
+
+.t-b1[data-v-6f1c18a2] {
+    background: var(--bgDark-2, var(--bg_color_L2));
+    padding-bottom: .37333rem
+}
+
+.t-b1-l[data-v-6f1c18a2] {
+    display: flex;
+    align-items: center;
+    font-size: .34667rem;
+    color: var(--text_color_L1)
+}
+
+.t-b1-l .w[data-v-6f1c18a2] {
+    font-weight: 500;
+    font-size: .37333rem
+}
+
+.t-b1-l>div[data-v-6f1c18a2]:first-child {
+    width: 3.70667rem;
+    padding-left: .26667rem;
+    text-align: left
+}
+
+.t-b1-l-n[data-v-6f1c18a2] {
+    display: flex;
+    justify-content: space-between;
+    flex: 1;
+    padding-right: .2rem
+}
+
+.t-b1-l-n>div[data-v-6f1c18a2] {
+    width: .48rem;
+    height: .48rem;
+    line-height: .48rem;
+    font-size: .34667rem;
+    color: #9da7b3;
+    text-align: center
+}
+
+.t-b1-l.lottery .t-b1-l-n>div[data-v-6f1c18a2] {
+    border-radius: 50%;
+    width: .48rem;
+    height: .48rem;
+    line-height: .42667rem;
+    font-size: .34667rem;
+    font-weight: 400;
+    text-align: center;
+    font-family: Roboto;
+    border: .01333rem solid #fd565c;
+    color: #fd565c !important
+}
+
+.t-b1-l+.t-b1-l[data-v-6f1c18a2] {
+    margin-top: .26667rem
+}
+
+.t-b1-l[data-v-6f1c18a2]:first-child {
+    padding-top: .34667rem;
+    height: .76rem;
+    padding-left: .26667rem
+}
+
+.t-b1-l-lottery[data-v-6f1c18a2] {
+    height: .48rem
+}
+
+.t-b2[data-v-6f1c18a2] {
+    position: relative;
+    font-size: .32rem;
+    background-color: var(--bg_color_L2, var(--text_color_L1));
+    padding: 0 0 .13333rem;
+    margin-bottom: .48rem
+}
+
+.t-b2-item[data-v-6f1c18a2] {
+    height: 1.33333rem;
+    padding: .45333rem .26667rem;
+    border-bottom: .01333rem solid #e1e3f2
+}
+
+.t-b2-item[data-v-6f1c18a2]:last-child {
+    border-bottom: none
+}
+
+.t-b2-empty[data-v-6f1c18a2] {
+    height: 5.33333rem
+}
+
+.t-b2-loading[data-v-6f1c18a2] {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 100%
+}
+
+.t-b2-i[data-v-6f1c18a2] {
+    color: var(--text_color_L1);
+    text-align: left
+}
+
+.t-b2-Num[data-v-6f1c18a2] {
+    display: flex;
+    position: relative;
+    height: .42667rem
+}
+
+.t-b2-Num>div[data-v-6f1c18a2] {
+    width: .4rem;
+    height: .4rem;
+    line-height: .4rem;
+    text-align: center;
+    border-radius: 50%
+}
+
+.t-b2-Num-item[data-v-6f1c18a2] {
+    border: .01333rem solid #e1e3f2;
+    color: #bbb;
+    margin-right: .10667rem;
+    font-size: .32rem
+}
+
+.t-b2-Num-item.action0[data-v-6f1c18a2] {
+    position: relative;
+    z-index: 10;
+    border: none;
+    color: #fff;
+    background-image: linear-gradient(135deg, #fd565c, #fd565c 50.37%, #ec4cdf 50.38%, #ec4cdf) !important
+}
+
+.t-b2-Num-item.actionB[data-v-6f1c18a2] {
+    border: none;
+    color: #fff;
+    background-color: #f3bd14
+}
+
+.t-b2-Num-item.actionS[data-v-6f1c18a2] {
+    border: none;
+    color: #fff;
+    background-color: var(--bgColor-13)
+}
+
+.t-b2-Num-item.action5[data-v-6f1c18a2] {
+    border: none;
+    color: #fff;
+    background-image: linear-gradient(to bottom right, #47ba7c 50%, #ec4cdf 0) !important;
+    position: relative;
+    z-index: 10
+}
+
+.t-b2-Num-item.action1[data-v-6f1c18a2],
+.t-b2-Num-item.action3[data-v-6f1c18a2],
+.t-b2-Num-item.action7[data-v-6f1c18a2],
+.t-b2-Num-item.action9[data-v-6f1c18a2] {
+    border: none;
+    color: #fff;
+    background-color: #47ba7c;
+    position: relative;
+    z-index: 10
+}
+
+.t-b2-Num-item.action2[data-v-6f1c18a2],
+.t-b2-Num-item.action4[data-v-6f1c18a2],
+.t-b2-Num-item.action6[data-v-6f1c18a2],
+.t-b2-Num-item.action8[data-v-6f1c18a2] {
+    border: none;
+    color: #fff;
+    background-color: #fd565c;
+    position: relative;
+    z-index: 10
+}
+
+.t-b2-Num-BS[data-v-6f1c18a2] {
+    color: #fff;
+    background: #609dec;
+    margin-left: .18667rem
+}
+
+.t-b2-Num-BS.isB[data-v-6f1c18a2] {
+    background: #f3bd14
+}
+
+.t-b2 .line-canvas[data-v-6f1c18a2] {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: 1.33333rem;
+    width: calc(100% - .64rem);
+    z-index: 0
+}
+
+html:lang(ar) .t-b2 .line-canvas[data-v-6f1c18a2] {
+    left: unset;
+    right: 0;
+    transform: scaleX(-1)
+}
+
+.t-origin[data-v-6f1c18a2] {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center
+}
+
+.t-origin-I[data-v-6f1c18a2] {
+    width: .26667rem;
+    height: .26667rem;
+    border-radius: 50%
+}
+
+.t-origin-I.violet[data-v-6f1c18a2] {
+    background-color: var(--bgcolor-21)
+}
+
+.t-origin-I.red[data-v-6f1c18a2] {
+    background: #fd565c
+}
+
+.t-origin-I.green[data-v-6f1c18a2] {
+    background: var(--bgcolor-22)
+}
+
+.t-foot[data-v-6f1c18a2] {
+    height: 1.86667rem;
+    background: var(--darkBg, var(--bg_color_L2));
+    color: var(--text_color_L2);
+    padding: 0 2.37333rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .93333rem
+}
+
+.t-foot-previous[data-v-6f1c18a2],
+.t-foot-next[data-v-6f1c18a2] {
+    width: .93333rem;
+    height: .93333rem;
+    border-radius: .13333rem;
+    background: var(--main-color);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center
+}
+
+.t-foot-previous.disabled[data-v-6f1c18a2],
+.t-foot-next.disabled[data-v-6f1c18a2] {
+    background: var(--bg_color_L3);
+    pointer-events: none;
+    color: var(--dividing-line_color)
+}
+
+/* ===== 13L-INJECT-v14: history un-clip + readable rows ===== */
+.my_r,.my\_r,.my_r-body,.my\_r-body,.MyGameRecord__C,.MyGameRecord\_\_C,.MyGameRecord__C-body,.MyGameRecord\_\_C-body,.my_r-body .list{height:auto!important;max-height:none!important;overflow:visible!important}
+.my_r-body .list-item{height:auto!important;min-height:1.55rem;box-sizing:border-box;padding:.10rem 0}
+.my_r-body .list-item-m-top,.MyGameRecord__C-body .list-item-m-top{color:#fff!important}
+.my_r-body .list-item-m-bottom,.MyGameRecord__C-body .list-item-m-bottom{color:#9a9a9a!important}
+.mutiplyContent,.radioContent{flex-wrap:wrap!important}
+
+/* ===== overlay.css copy ===== */
+/* 13L overlay — v4: loaded after the theme CSS (index.html injects it).
+   Pill ✕ rules REMOVED: this skin has its own native close button on the
+   Download-APP bar; the injected duplicate is gone. */
+
+/* ---- bet-panel layout guard ----
+   The WinGo panels are a 10rem grid that must equal the viewport width. If
+   the rem base drifts above viewport/10 (browser zoom etc.), the balls, the
+   multiplier chips and the tabs overflow the screen and get clipped. Lock it;
+   above 400px the original 40px desktop base is preserved. */
+html {
+    font-size: min(10vw, 40px) !important;
+}
+#app {
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+#app .select {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: .32rem;
+    padding-right: .32rem;
+    box-sizing: border-box;
+}
+#app .bet_body .ramd {
+    flex-wrap: wrap;
+    height: auto !important;
+    min-height: .90667rem;
+    row-gap: .13333rem;
+}
+#app .bet_body .ramd .r {
+    flex: 0 0 auto;
+    padding: 0 .13333rem;
+    box-sizing: border-box;
+}
+#app .bet_body .betNum {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+
+/* ===== 13L-CSS-v18: history rows must always render ===== */
+[class*="my_r-body"] .list>div,[class*="my_r-body"] .list>div:nth-child(n+1){display:block!important;visibility:visible!important;opacity:1!important;max-height:none!important}
+[class*="my_r-body"] .list-item,[class*="my_r-body"] .list-item:nth-child(n+4){display:flex!important;height:auto!important;min-height:1.55rem}
+[class*="my_r-body"] .list,[class*="MyGameRecord__C-body"]{height:auto!important;max-height:none!important;overflow:visible!important}
+[class*="my_r-body"] .list-item-m-top,[class*="my_r-body"] .list-item-m-bottom{color:#fff!important}
+[class*="my_r-body"] .list-item-m-bottom{color:#9a9a9a!important}

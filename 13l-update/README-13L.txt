@@ -1,3 +1,29 @@
+V28 — TARGETED HISTORY/CHART PATCH (2026-09-08)
+==============================================
+Status: locally regression-tested; LIVE acceptance requires /13l-net.php PINGs.
+- Compared actual DhaniWin and 13L MyRecord/Trend modules and backend contracts.
+- Legacy limitHistory/forceGameHistoryPage10 hide nested cells and van-row nodes.
+  Scoped native display rules beat those timers without rewriting any core JS.
+- Removed v27 all-game/JWT filler and amount-based row matching entirely.
+  Native per-game API rows, amounts, timestamps, detail toggles remain authoritative.
+- WinGo Chart: provider-only closed history; 10 rows/page, actual totals.
+  No synthesized fallback digit. Feed unavailable means no fabricated history.
+- Trend data is now the native ten-digit array with missingCount, avgMissing,
+  openCount, maxContinuous. Statistics use up to 100 available provider rows;
+  sampleCount records the actual window (never pads missing provider rows).
+- OverlayPing undefined $d corrected to $data; separate PING tail in net viewer.
+- Wallet/settlement engine, DB configuration, header branding and site core files
+  unchanged. No index.html in this ZIP. UI changes only hist25.js / patch25.css.
+- Local tests: PHP syntax; period gate, provider row validation, per-game filter,
+  zero result, real pagination/stats; Chromium 320/360/390/430, legacy timers
+  running for 5.3 seconds, 10 visible chart rows, zero hidden tested cells.
+- Deploy only through the owner's approved GitHub branch + 13l-deploy.php loop.
+  After deployment read net viewer for boot28/history28/chart28. Do not claim
+  phone acceptance from local fixture tests alone.
+
+Historical release notes below (older instructions may be superseded):
+-------------------------------------------------------------------
+
 13L555 FINAL PACKAGE (v5) — SAB SETUP KHUD
 =============================================
 Ab tumhe sirf 2 kaam karne hain. Bas. Koi file edit nahi karni —
@@ -166,3 +192,106 @@ V13.1 — HISTORY WIN AMOUNT EXACT:
   stake-FEE (post-tax) jaata hai → +₹1,960 (jo sach me credit hua),
   pehle +₹1,980 (fee double-count) dikh raha tha. DB/wallet/popup untouched
   — sirf display. Verify: 52327 Big = +1,960 ; 52305 Big = +19,600.
+
+V15 — SPY LOG: router ab har My-history/Game-history request ko
+api/_core/.netlog me note karta hai (app ne kya maanga, server ne kitna
+bheja) + 13l-net.php use tail + deploy/inject status dikhata hai. Isse
+"rows gyab" ka final faisla hoga: app cache vs pageSize vs CSS clip.
+
+V16 — APP CACHE KA ASLI KAAT: netlog ne prove kiya app history API call
+hi nahi kar raha — sab kuch localStorage 'allGames' cache se render hota
+tha (purana/pura data, 3 rows waghairah). 13l-jsinject.php skin ki entry
+JS ke end me ek-one-clear patch lagata hai: login-token safe, sirf
+history-cache keys + vuex blob ke nested cache fields remove, ek baar,
+auto-reload → uske baad hamesha LIVE data. Rollback: .bak13l.
+
+V17 — "1 SEC ME GAYAB" KA ASLI KAAT: skin ka runtime JS tab mount ke baad
+list ke parent ko fixed height + overflow:hidden lock kar deta hai
+(empty-state height 5.33rem ≈ 3 rows = '2 full + teesre ka sirf amount').
+13l-unclip.php entry JS me watchdog patch karta hai: har 400ms + click/resize
+par history containers ke parent chain ko un-clip karta rehta hai (sirf
+history nodes; baaki UI untouched). Rollback: .bak13lu backup.
+
+V18 — PER-GAME HISTORY (user ne clear kiya: har tab apni bets dikhaye —
+  v13 ka all-games mix REVERTED, original filter wapas) + 13l-allfix.php:
+  ek click me theme-CSS reveal rules + un-clip watchdog (marker-safe) +
+  deploy/netlog report. Yehi final history behaviour hai.
+
+V19 — FINAL CACHE-UNSTUCK: skin store hydration k random-named
+localStorage keys se purani rows (v10 format: no betContent '_', fee=0)
+ghisi jaati thi — isliye period/left column khaali. 13l-v19.php entry
+bundle me content-based purge patch daalta hai (jo key bhi history-row
+JSON rakhe → strip/remove; tokens safe) + stale row dikhe to pagination
+poke karke live refetch. Marker '13L-V19-UNSTUCK', backup .bak19.
+
+V20 SKINSYNC — user ne bola DhaniWin ka skin copy karo: 13l-skinsync.php
+13L server se hi dhaniwin.club9.eu.cc ka poora js/css chunk graph BFS se
+download karke local js/ css/ me daalta hai; hardcoded dhaniwin domains/
+brand strings → 13L; index.html ka SIRF entry (js/index-*.js, css/
+index-*.css) swap hota hai — title, favicon, /webapi config, custom fix
+scripts (share-fix, native-*, v24-v26) sab untouched. Backup:
+index.html.bakskin. Pehle &dry=1 se dry-run, phir real. Purane skin files
+delete nahi hote (rollback = index.html.bakskin wapas copy).
+
+V20.1 RESTORE — skinsync se site kharab hui to: 13l-restore.php =
+index.html.bakskin se html wapas + overwrite hui entry js ko .bak13l se
+restore + reference/missing asset report + css-marker check. Data/DB
+untouched. Post-restore: cssinject + allfix links dobara chala sakte hain
+(marker-safe idempotent).
+
+V21 — VERIFY-FIRST: 13l-rows.php read-only dump: (A) last 12 bets — DB raw
+vs EXACT API row (issueNumber>=17d? betContent has '_'? betTime epoch? premium
+present?) (B) game-history/chart sample (C) patch markers on entry js + theme
+css (D) netlog tail. Use: agent khud fetch karke verify karta hai, user ko
+sirf deploy + (missing ho) 13l-v19 link.
+
+V22 HISTFIX — FINAL RENDER GUARANTEE: 13l-histfix.php js/13l-overlay.js me
+DOM-filler add karta hai: My-history ki khaali cells (period/time/chip) ko
+LIVE /webapi/Lottery/GetMyGameRecord rows se bhar deta hai (numeric amount
+match, svg-safe, data-13lf once-markers). Skin ke andar ka jo bhi stale
+store ho, screen sahi dikhegi. Rollback: .bak22 truncate.
+
+V24 BEACON-HISTFIX: filler ab phone se khud report karta hai —
+Site/OverlayPing endpoint (router) netlog me 'PING' lines likhta hai:
+boot/fetch-ok/filled=N/scan bad=N + pehli baad 400-char DOM snippet
+(actual row HTML). Isse bina screenshot ke remote diagnosis possible.
+Plus: index.html me overlay <script> tag check/add (css-link-only false
+positive fixed). Marker 13L-HISTFIX-v24, .bak24 backups.
+
+V25 CACHE-BREAK — root cause of ALL "patch not working": phone/webview
+serving OLD cached js/css (overlay PING never fired despite file patched).
+13l-histfix v25: fresh-named /js/13l-hist25.js (filler+beacon) + /css/
+13l-patch25.css + index.html tags with ?cb= + sw.js kill (delete caches,
+unregister, reload) + .htaccess no-cache for html/js/css + netlog auto-trim.
+Backups: .bak25/.bak25b/.bak25c.
+
+V26 — hist25.js rewrite: invisible-cell repair (DOM me text hai par height-0),
+DOM-snippet beacon (scan26 bad=N → row HTML), header tweaks: 13L logo center +
+'Deposit' button hide. Deploy auto-run karta hai. Same URL + no-cache = fresh.
+
+V26b — headFix fix: logo sirf khud center (position:absolute+margin:auto trick),
+header bar/back button UNTOUCHED — back button left pe apni jagah. Deposit-hide
+same. Deploy auto-run.
+
+V26c — CRITICAL: v26b ne game page pe poori header-row chhupa di (Deposit ka
+parent row nikla). Ab: sirf 'Deposit'-matra-content element hide (width<=60vw,
+no img children), logo center absolute trick with ancestor-safe guard.
+
+V26d — logo fix: fit-content HATAAYA (usse natural 600px logo header me giant
+dikh raha tha). Ab: size/site-ki-apni-CSS-jaisi, sirf left:50%+translate(-50%,
+-50%) se center, max-width 62% guard, idempotent marker /*13lc*/.
+
+V26E — headFix GATE: home page (pathname '/' ya '') pe headFix bilkul NAHI chalta
+— logo center + Deposit-hide sirf game/history sub-pages pe. (Home pe logo
+center hone se balance overlap ho raha tha — user ne pakda.)
+
+V26F — flicker fix: home→WinGo route change pe logo ~900ms tak left me dikhta
+tha (tick interval). Ab headFix 150ms fast-loop + pushState/replaceState/
+popstate hooks se mount ke SAME frame pe center. Idempotent marker /*13lc*/ se
+dobara-dobara style write nahi → no jitter.
+
+V27 — (1) Chart panel unclip: 'Max consecutive' wale page pe 17-digit period
+row se upar walk karke clipped container (scrollHeight>clientHeight) ko
+height:auto+overflow:visible — ab 10/10 rows. (2) History flicker Khatam:
+MutationObserver+rAF → Vue ke re-render ke AGLE frame me hi refill (900ms tick
+sirf backstop). pings: chart27 unclip/noclip/no-row.
