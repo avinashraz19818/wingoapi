@@ -1,0 +1,44 @@
+[
+  {
+    "width": 320,
+    "oldDisplaced": 1,
+    "afterScrollAllInside": true,
+    "walletDepositVisible": true,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "oldDisplaced": 1,
+    "afterScrollAllInside": true,
+    "walletDepositVisible": true,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "oldDisplaced": 1,
+    "afterScrollAllInside": true,
+    "walletDepositVisible": true,
+    "errors": []
+  },
+  {
+    "width": 393,
+    "oldDisplaced": 1,
+    "afterScrollAllInside": true,
+    "walletDepositVisible": true,
+    "errors": []
+  },
+  {
+    "width": 411,
+    "oldDisplaced": 0,
+    "afterScrollAllInside": true,
+    "walletDepositVisible": true,
+    "errors": []
+  },
+  {
+    "width": 430,
+    "oldDisplaced": 0,
+    "afterScrollAllInside": true,
+    "walletDepositVisible": true,
+    "errors": []
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "pass": true,
+  "initial": "20260908100010600",
+  "afterZero": "20260908100010601",
+  "afterLateResult": "20260908100010600",
+  "afterRetry": "20260908100010604",
+  "afterGameSwitch": "20260908100050605",
+  "afterVisibility": "20260908100050610",
+  "providerOnly": true,
+  "noFutureRows": true,
+  "noCrossGameRows": true,
+  "unmountClean": true,
+  "errors": []
+}

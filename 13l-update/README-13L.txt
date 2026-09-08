@@ -1,3 +1,45 @@
+V34 — CLOCK POSITION + NATIVE ROUND REFRESH / RETRY
+==================================================
+User reported displaced tab clock on scroll, stale issue and history requiring
+back/re-entry. When asked about the limited native correction, user said:
+"Mujhe nhi pata bas fix kro sab sahi se". No whole skin/index replacement.
+
+- Header logo logic now uses explicit header/logo selectors, never arbitrary
+  images near viewport top. Repairs prior 13lc-marked tab clocks. Wallet
+  Deposit cannot be hidden merely because scrolling puts it near the top.
+- Native WinGo composable now uses a server-derived monotonic deadline and
+  a scoped 250ms watchdog: zero triggers authoritative issue refresh; request
+  failures retry with bounded backoff instead of permanently pausing the timer.
+- Current period is never incremented/guessed. Same-game old issue responses
+  are rejected. Request-generation/game guards discard late old-tab replies.
+- Native history reads the existing filtered provider API, polls after zero
+  and retries while publication is delayed. Never invents missing results or
+  displays current/future periods. Native refs/templates own display/pagination.
+- New closed results notify the existing own-bet history refresh event. No
+  new wagers, wallet writes, settlement/result-generation or token-scanning code.
+- Timer locks at zero while issue refresh is pending. Matching native issue
+  is required before betting can be enabled; normal last-5-second lock retained.
+- Watchdog stops on unmount/background/non-WinGo route; visibility resume syncs.
+- Scoped native patch: ONLY js/dragon-65oA2ftS.js, via exact before/after SHA256
+  manifest tools/13l-native34.json. Backup .bak34 + atomic write; unknown native
+  builds refused. Main bundle/index/other skin bundles NOT replaced or packaged.
+- CSS, v33 dark backdrop/red timer, v31 fonts/chips, v30 history keys unchanged.
+- header34, round34, roll34, retry34 and result34 beacons in /13l-net.php.
+  Phone acceptance still needs refreshed client's session across a boundary.
+
+Validation:
+- Clock corruption reproduced and fixed across320/360/390/393/411/430 + scroll.
+- Real native composable/Vue simulated failures/delayed provider/game switches,
+  background resume, no future/cross-game rows, cleanup and bet gating PASS.
+- PHP real installer: backup/hash/atomic write, second-run idempotence, unknown
+  build refusal, emitted JS byte equality, index and .htaccess unchanged PASS.
+- Existing v31 typography, v32 timer/actions, v33 backdrop and v30 compiled Vue
+  game-key/pagination regressions PASS. PHP/node syntax PASS.
+- Live PUBLIC-provider integration (not logged-in phone proof):
+  30S 20260908100051287 -> 1288, newly closed1287 appeared without navigation.
+  1M  20260908100010644 -> 0645, newly closed0644 appeared without navigation.
+  No simulated results used for these two live-provider integrations.
+
 V33 — REMOVE THE ACTUAL RED BACKDROP BEHIND WALLET
 =================================================
 User correctly reported red area remained after v32; phone boot32/top32
