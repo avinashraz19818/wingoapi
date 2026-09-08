@@ -1,3 +1,15 @@
+V40 — LIGHTER COUNTDOWN DIGIT COLOUR ONLY
+========================================
+User said time colour too strong; match softer reference, everything else OK.
+References IMG_20260908_194921_881.jpg and IMG_20260908_194921_392.jpg.
+Only small ticket countdown digit/colon and pending-dash colour changed from
+#b51b32 to softer #df6c6f. No opacity, weight, font-size, ticket background,
+period text, native big closing overlay, layout or game behaviour changes.
+Exact source comparison: two CSS colour values plus version labels only; all
+other overlay JS and CSS byte-identical. Native modules/manifests/art unchanged.
+Six-width timer/backdrop/loading and native-round tests PASS; wallet39, winning38,
+header/scroll/fonts/history regressions PASS. Same31-file ZIP whitelist.
+
 V39 — ORIGINAL DHANI WALLET REFRESH ICON + VERIFIED NATIVE BALANCE FLOW
 ====================================================================
 User reference IMG_20260908_185809_002.jpg points to refresh beside balance.

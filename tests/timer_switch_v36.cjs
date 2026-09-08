@@ -24,9 +24,9 @@ for(const [variable,file] of [['headset35','customer.svg'],['mute36','mute.svg']
  const pending=async()=>{assert.equal(await p.locator('html').getAttribute('data-13l-timer-ready'),'0');assert.equal(await p.locator('.TimeLeft__C-time').getAttribute('aria-busy'),'true');assert.equal(await cell.evaluate(e=>getComputedStyle(e).color),'rgba(0, 0, 0, 0)');assert.equal(await cell.evaluate(e=>getComputedStyle(e,'::after').content),'"–"');};
  await pending();assert.equal(await p.locator('.TimeLeft__C-time').innerText().then(t=>t.replace(/\s/g,'')),'00:00','native values are untouched, just pending presentation');
  await p.screenshot({path:'/home/user/inspection/ui36/pending-'+width+'.png'});
- await p.evaluate(()=>publish36('WinGo_1M',47));await p.waitForTimeout(60);assert.equal(await p.locator('html').getAttribute('data-13l-timer-ready'),'1');assert.equal(await cell.evaluate(e=>getComputedStyle(e).color),'rgb(181, 27, 50)');
+ await p.evaluate(()=>publish36('WinGo_1M',47));await p.waitForTimeout(60);assert.equal(await p.locator('html').getAttribute('data-13l-timer-ready'),'1');assert.equal(await cell.evaluate(e=>getComputedStyle(e).color),'rgb(223, 108, 111)');
  // Real round zero must remain visible, never treated as a loading signal.
- await p.evaluate(()=>state.seconds=0);await p.waitForTimeout(60);assert.equal(await p.locator('html').getAttribute('data-13l-timer-ready'),'1');assert.equal(await cell.evaluate(e=>getComputedStyle(e).color),'rgb(181, 27, 50)');
+ await p.evaluate(()=>state.seconds=0);await p.waitForTimeout(60);assert.equal(await p.locator('html').getAttribute('data-13l-timer-ready'),'1');assert.equal(await cell.evaluate(e=>getComputedStyle(e).color),'rgb(223, 108, 111)');
  await p.getByRole('button',{name:'30S',exact:true}).click();await pending();await p.waitForTimeout(1200);await pending();
  await p.getByRole('button',{name:'3M',exact:true}).click();await pending();assert.equal(await p.evaluate(()=>publish36('WinGo_30S',21)),false,'late old-tab response cannot release loading gate');await pending();
  assert.equal(await p.evaluate(()=>publish36('WinGo_3M',125)),true);await p.waitForTimeout(80);assert.equal(await p.locator('html').getAttribute('data-13l-timer-ready'),'1');assert.equal(await p.locator('.TimeLeft__C-time').innerText().then(t=>t.replace(/\s/g,'')),'02:05');
