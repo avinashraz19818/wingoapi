@@ -1,3 +1,35 @@
+V37 — SWITCH-TIME BETTING OVERLAY LOADING STATE
+==============================================
+User screenshot Screenshot_2026-09-08-18-26-12-33_40deb401b9ffe8e1df2f1cc5ba480b12.jpg
+showed upper --:-- but large native00 tiles covering betting controls on switch.
+v36 had handled only the ticket digits; the separate native bet-lock digits
+were still visible while the selected game's initial API data was pending.
+
+- For validated-readiness=0 only, hide the digit tiles inside the existing
+  .winGo3 .Betting__C-mark and show a small spinner/Loading game label instead.
+  Keep the original full-size overlay and pointer interception: no enabling
+  betting, no removing v-show, no fabricated countdown or period.
+- Readiness=1 restores completely native closing05..00. Actual expiry remains
+  visible. Pending is based on native current-game validation, never seconds==0.
+- Spinner respects reduced-motion. Existing top placeholder remains until the
+  actual server response. This does not claim to eliminate network latency.
+- aria-busy covers both ticket and bet-lock overlay; overlay37 diagnostics show
+  pending/lockShown/visibleDigits. Other game routes have no loading37 styling.
+- Native module8228B and both native34/36 manifests unchanged. Dhani icons,
+  direct audio setting, Deposit, logo, prior fonts/history/rollover preserved.
+  Same30-file whitelist, original16 root PHP; no index/whole skin replacement.
+
+Validation: production Vue/native bet-overlay structure and actual relevant
+index-CNri-etw.css rules, six widths320/360/390/393/411/430. Pending digit tiles
+invisible, pointer shield blocks underlying bet action, delayed/late response
+and rapid-switch isolation PASS. Real05..00 visible and still blocks taps;
+valid/open native bet action works; reduced-motion and no-overflow PASS.
+Native round/installer, header35 audio/icons, timer36 and scroll34 PASS.
+Phone BEFORE37 net confirms36 soundReady1 and 1M ready0 at18:26:02 ->ready1
+18:26:03. This fixes the leftover lower overlay, not native network timing.
+Fixture screenshots are not proof of phone37 appearance; live hash/net and
+refreshed phone checks are separate.
+
 V36 — SWITCH LOADING GUARD + ORIGINAL DHANIWIN HEADER ICONS / SOUND BINDING
 ==========================================================================
 Scope: only initial/switch countdown presentation and the requested header controls.

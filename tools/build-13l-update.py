@@ -9,7 +9,7 @@ for directory in ['api','css','js','tools']:
     files+=sorted(p for p in (source/directory).rglob('*') if p.is_file())
 assert len(roots)==16 and all(p.is_file() and not p.is_symlink() for p in files)
 assert not any(p.name=='index.html' or p.name.startswith('.') for p in files)
-assert (source/'js/13l-hist25.js').read_text().startswith('/* 13L-HIST25-v36')
+assert (source/'js/13l-hist25.js').read_text().startswith('/* 13L-HIST25-v37')
 dest=base/'13l-update/13l-update.zip'
 with zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
     for p in files:
