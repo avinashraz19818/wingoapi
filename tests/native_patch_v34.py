@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile,subprocess,hashlib,json,shutil
 base=Path(__file__).resolve().parents[1];src=base/'.w13l';manifest=json.loads((src/'tools/13l-native34.json').read_text());addon=json.loads((src/'tools/13l-native36.json').read_text())
 with tempfile.TemporaryDirectory(dir=base) as td:
- r=Path(td);(r/'js').mkdir();(r/'tools').mkdir();shutil.copy(src/'13l-histfix.php',r/'13l-histfix.php');shutil.copy(src/'tools/13l-native34.json',r/'tools/13l-native34.json');shutil.copy(src/'tools/13l-native36.json',r/'tools/13l-native36.json');shutil.copy(base/'tests/fixtures/native-v34/dragon-original.js',r/manifest['file'])
+ r=Path(td);(r/'js').mkdir();(r/'tools').mkdir();shutil.copy(src/'13l-histfix.php',r/'13l-histfix.php');shutil.copy(src/'tools/13l-native34.json',r/'tools/13l-native34.json');shutil.copy(src/'tools/13l-native36.json',r/'tools/13l-native36.json');shutil.copy(src/'tools/13l-art38.json',r/'tools/13l-art38.json');shutil.copy(base/'tests/fixtures/native-v34/dragon-original.js',r/manifest['file'])
  index=b'<html><body><script src="/js/13l-hist25.js"></script></body></html>';(r/'index.html').write_bytes(index);(r/'.htaccess').write_text('# 13L-NO-CACHE\n')
  def run():return subprocess.check_output(['php','-r',"$_GET['key']='13l2026';include '13l-histfix.php';"],cwd=r,text=True)
  first=run();assert 'Native34: applied ' in first,first

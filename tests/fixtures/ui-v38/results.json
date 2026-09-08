@@ -1,0 +1,92 @@
+[
+  {
+    "width": 320,
+    "imageDecoded": [
+      1186,
+      1624
+    ],
+    "nativeAmountAndPeriodUnchanged": true,
+    "autoClose3000ms": true,
+    "autoCloseToggle": true,
+    "manualClose": true,
+    "loseUnchanged": true,
+    "routeScoped": true,
+    "noClipping": true,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "imageDecoded": [
+      1186,
+      1624
+    ],
+    "nativeAmountAndPeriodUnchanged": true,
+    "autoClose3000ms": true,
+    "autoCloseToggle": true,
+    "manualClose": true,
+    "loseUnchanged": true,
+    "routeScoped": true,
+    "noClipping": true,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "imageDecoded": [
+      1186,
+      1624
+    ],
+    "nativeAmountAndPeriodUnchanged": true,
+    "autoClose3000ms": true,
+    "autoCloseToggle": true,
+    "manualClose": true,
+    "loseUnchanged": true,
+    "routeScoped": true,
+    "noClipping": true,
+    "errors": []
+  },
+  {
+    "width": 393,
+    "imageDecoded": [
+      1186,
+      1624
+    ],
+    "nativeAmountAndPeriodUnchanged": true,
+    "autoClose3000ms": true,
+    "autoCloseToggle": true,
+    "manualClose": true,
+    "loseUnchanged": true,
+    "routeScoped": true,
+    "noClipping": true,
+    "errors": []
+  },
+  {
+    "width": 411,
+    "imageDecoded": [
+      1186,
+      1624
+    ],
+    "nativeAmountAndPeriodUnchanged": true,
+    "autoClose3000ms": true,
+    "autoCloseToggle": true,
+    "manualClose": true,
+    "loseUnchanged": true,
+    "routeScoped": true,
+    "noClipping": true,
+    "errors": []
+  },
+  {
+    "width": 430,
+    "imageDecoded": [
+      1186,
+      1624
+    ],
+    "nativeAmountAndPeriodUnchanged": true,
+    "autoClose3000ms": true,
+    "autoCloseToggle": true,
+    "manualClose": true,
+    "loseUnchanged": true,
+    "routeScoped": true,
+    "noClipping": true,
+    "errors": []
+  }
+]

@@ -1,3 +1,39 @@
+V38 — RESTORE MISSING ORIGINAL WINNING POPUP ART
+===============================================
+User screenshot Screenshot_2026-09-08-18-53-34-81_40deb401b9ffe8e1df2f1cc5ba480b12.jpg
+showed Congratulations/result/amount/confetti but no winning card artwork.
+Root cause confirmed: /images/missningBg-CVBJxzJu.webp returned404 on13L.
+The existing native Winning component (tips-DJIxz9GI.js, data-v-a91426ba) and
+main-GN8fm3iy.css already reference this exact original background image.
+
+- Recovered the same filename/hash asset from DhaniWin:135480B,1186x1624 WebP,
+  SHA256 bf2ff71ea34bf2ee621f09805bb365977885ce92b833a1de209a690bbd599057.
+  Loss/close assets on both sites are byte-identical and already work on13L.
+- New tools/13l-art38.json packages the original bytes. Histfix validates fixed
+  path/size/SHA256, restores missing image atomically to its original images path,
+  and skips already-correct art. Unknown existing art or bad payload is refused.
+  No image redraw, whole-skin port, result/amount/settlement modifications.
+- WinGo-only winning-body.isWin/data-v-a91426ba points to the same local image
+  with ?art=38 to bypass a cached404. No geometry/color/text/lose-popup changes.
+  Small same-origin preloader warms that exact URL on entering WinGo; art38
+  reports image load/decode dimensions without result/account data.
+- Native countdown/sound module8228B and manifests34/36 are unchanged. Deposit,
+  logo/Dhani controls, history and v37 pending bet-lock behavior preserved.
+- ZIP whitelist remains original16 root PHP +api/css/js/tools/README; now31 files.
+  No index.html or whole native skin bundle in ZIP; image is installed from the
+  hash-checked tools manifest, not an arbitrary directory extraction.
+
+Validation: actual extracted native Winning component + original scoped CSS,
+production Vue, six widths320/360/390/393/411/430. Browser decodes original artwork
+1186x1624, amount1960.00/period/result unchanged, native3s auto-close/manual close/
+auto-close toggle pass; loss-popup and other-route style unchanged, no clipping.
+Lottie/audio loaders are stubbed in this UI fixture, not modified in production.
+Asset installer restore/idempotence/bad-payload/unknown-art guards pass; unrelated
+images, native module and index unchanged. Native round/installer, pending37,
+header35, timer32/backdrop33/scroll34/fonts31/compiled keys30 regressions pass.
+No real bets are placed by the popup tests. Phone appearance remains a separate
+check from original-asset HTTP/hash verification and the native-component fixture.
+
 V37 — SWITCH-TIME BETTING OVERLAY LOADING STATE
 ==============================================
 User screenshot Screenshot_2026-09-08-18-26-12-33_40deb401b9ffe8e1df2f1cc5ba480b12.jpg
