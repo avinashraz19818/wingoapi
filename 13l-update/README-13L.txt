@@ -1,3 +1,24 @@
+V32 — SCREENSHOT HEADER / WALLET / TIMER APPEARANCE
+==================================================
+- WinGo route only: dark #282828 header/backdrop and #3b3b3b wallet card.
+- Removes only the absolute Wallet__C::before red gradient decoration.
+  Wallet balance, native actions and layout remain intact.
+- Red SVG ticket with transparent centre notches, dashed separator; white
+  digit tiles, dark-red #b51b32 digits, white timer heading and live period.
+- Embedded genuine Poppins Latin 600/700 for wallet/timer typography:
+  https://dhaniwin.club9.eu.cc/assets/latin_600-zEkxB9Mr.woff2 (8000 bytes)
+  https://dhaniwin.club9.eu.cc/assets/latin_700-Qrb0O0WB.woff2 (7816 bytes)
+  Same Poppins SIL OFL 1.1 license reproduced below. No remote runtime font calls.
+- No replacement index.html or site skin. No balance/period/countdown text
+  rewrite. Provider, bets, settlement and per-game history logic unchanged.
+- Browser fixtures at320/360/390/411/430: native wallet/timer CSS; no clipped
+  timer elements; actual Poppins Bold rendering; action handlers and changing
+  countdown preserved; home/K3 route removes the new UI gate.
+- v31 history appearance/font regression and v30 production-compiled Vue
+  KeepAlive/game-switch/pagination tests pass with v32 UI files.
+- Read-only top32 beacon reports removed backdrop and actual timer styles.
+  Local fixtures are NOT logged-in/live-phone acceptance evidence.
+
 V31 — ACTUAL DHANIWIN POPPINS FONT + ROUNDED CHIP FIX
 ===================================================
 Live investigation: DhaniWin base CSS includes Poppins @font-face files;

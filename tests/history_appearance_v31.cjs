@@ -1,7 +1,7 @@
 const {chromium}=require('playwright');const fs=require('fs'),path=require('path'),assert=require('assert');
 const base=path.resolve(__dirname,'../.w13l'),fixtures=path.resolve(__dirname,'fixtures/history-v31');
 const css=fs.readFileSync(base+'/css/13l-patch25.css','utf8');const reference=fs.readFileSync(fixtures+'/dhani-record.css','utf8');
-const faces=(css.match(/@font-face\{[^}]+\}/g)||[]).join('\n');assert.equal((faces.match(/@font-face/g)||[]).length,4);
+const faces=(css.match(/@font-face\{[^}]+\}/g)||[]).join('\n');assert.equal((faces.match(/@font-face/g)||[]).length,6); // v32 adds 600/700; original history fonts/metrics remain unchanged.
 const sample=()=>Array.from({length:10},(_,i)=>`<div><div class="list-item"><div class="list-item-l"><div class="list-item-l-${i<2?['big','small'][i]:i%10}">${i<2?['Big','Small'][i]:i%10}</div></div><div class="list-item-m"><div class="list-item-m-top">20260908100010542<svg width="9" height="8"></svg></div><div class="list-item-m-bottom">2026-09-08 14:31:39</div></div><div class="list-item-r ${i%2?'success':''}"><div>${i%2?'success':'Lose'}</div><span>${i%2?'+₹196.00':'-₹100.00'}</span></div></div></div>`).join('');
 const palettes=':root{--text_color_L1:#fff;--bg_color_L2:#252525;--norm_secondary-color:#ffb35c;--norm_bule-color:#6ba5ec;--norm_green-color:#13c164;--norm_red-color:#f0484b;--norm_Purple-color:#ad4dff}';
 const markup=`<main class="history"><div class="my_r"><div class="my_r-body"><div class="list">${sample()}</div></div></div></main>`;
