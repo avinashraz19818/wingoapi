@@ -1,3 +1,18 @@
+V33 — REMOVE THE ACTUAL RED BACKDROP BEHIND WALLET
+=================================================
+User correctly reported red area remained after v32; phone boot32/top32
+confirmed updated files loaded, not a cache/reload problem.
+Root cause: native lottery-info creates a separate direct .bg decoration
+(9rem high red gradient). This skin ALREADY disables Wallet::before.
+- Hide ONLY .lottery-info > .bg under the existing WinGo route gate.
+- Keep lottery-info surface #282828; native layout/actions stay untouched.
+- Timer styling, balance/countdown values, history, provider and bets unchanged.
+- Full-wrapper native CSS fixture reproduces v32 red background, then confirms
+  v33 removes the actual .bg at320/360/390/411/430. Home/K3 restores original
+  decoration. Existing timer/click/countdown/font and history/Vue tests PASS.
+- New read-only top33 beacon adds infoBG display, surface and wallet colors.
+  Phone acceptance requires top33 infoBG=none and user's visual confirmation.
+
 V32 — SCREENSHOT HEADER / WALLET / TIMER APPEARANCE
 ==================================================
 - WinGo route only: dark #282828 header/backdrop and #3b3b3b wallet card.

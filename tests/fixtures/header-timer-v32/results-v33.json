@@ -1,0 +1,122 @@
+[
+  {
+    "width": 320,
+    "infoBG": "none",
+    "surface": "rgb(40, 40, 40)",
+    "redLayer": "none",
+    "wallet": "rgb(59, 59, 59)",
+    "header": "rgb(40, 40, 40)",
+    "digit": "rgb(181, 27, 50)",
+    "cell": "rgb(255, 255, 255)",
+    "font": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+    "weight": "700",
+    "actualFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Bold",
+        "isCustomFont": true,
+        "glyphCount": 1
+      }
+    ],
+    "clipping": false,
+    "actionsPreserved": true,
+    "countdownPreserved": true,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "infoBG": "none",
+    "surface": "rgb(40, 40, 40)",
+    "redLayer": "none",
+    "wallet": "rgb(59, 59, 59)",
+    "header": "rgb(40, 40, 40)",
+    "digit": "rgb(181, 27, 50)",
+    "cell": "rgb(255, 255, 255)",
+    "font": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+    "weight": "700",
+    "actualFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Bold",
+        "isCustomFont": true,
+        "glyphCount": 1
+      }
+    ],
+    "clipping": false,
+    "actionsPreserved": true,
+    "countdownPreserved": true,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "infoBG": "none",
+    "surface": "rgb(40, 40, 40)",
+    "redLayer": "none",
+    "wallet": "rgb(59, 59, 59)",
+    "header": "rgb(40, 40, 40)",
+    "digit": "rgb(181, 27, 50)",
+    "cell": "rgb(255, 255, 255)",
+    "font": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+    "weight": "700",
+    "actualFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Bold",
+        "isCustomFont": true,
+        "glyphCount": 1
+      }
+    ],
+    "clipping": false,
+    "actionsPreserved": true,
+    "countdownPreserved": true,
+    "errors": []
+  },
+  {
+    "width": 411,
+    "infoBG": "none",
+    "surface": "rgb(40, 40, 40)",
+    "redLayer": "none",
+    "wallet": "rgb(59, 59, 59)",
+    "header": "rgb(40, 40, 40)",
+    "digit": "rgb(181, 27, 50)",
+    "cell": "rgb(255, 255, 255)",
+    "font": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+    "weight": "700",
+    "actualFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Bold",
+        "isCustomFont": true,
+        "glyphCount": 1
+      }
+    ],
+    "clipping": false,
+    "actionsPreserved": true,
+    "countdownPreserved": true,
+    "errors": []
+  },
+  {
+    "width": 430,
+    "infoBG": "none",
+    "surface": "rgb(40, 40, 40)",
+    "redLayer": "none",
+    "wallet": "rgb(59, 59, 59)",
+    "header": "rgb(40, 40, 40)",
+    "digit": "rgb(181, 27, 50)",
+    "cell": "rgb(255, 255, 255)",
+    "font": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+    "weight": "700",
+    "actualFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Bold",
+        "isCustomFont": true,
+        "glyphCount": 1
+      }
+    ],
+    "clipping": false,
+    "actionsPreserved": true,
+    "countdownPreserved": true,
+    "errors": []
+  }
+]

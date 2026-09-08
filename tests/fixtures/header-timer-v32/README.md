@@ -7,3 +7,9 @@ Only header/wallet/timer are tested; placeholder nav/balls are NOT production re
 Run: NODE_PATH=/home/user/inspection/node_modules node tests/header_timer_v32.cjs
 The patched font, geometry, route gate, native action callbacks and independently
 changed countdown are checked at five phone widths. Data/engine tests separate.
+
+## v33 correction
+The original v32 fixture omitted the parent lottery-info / direct bg div.
+Phone feedback exposed this coverage gap. header_backdrop_v33.cjs uses the
+full wrapper and native scope attributes, reproduces v32's remaining red
+layer using commit a679871 assets, and tests the narrow v33 correction.
