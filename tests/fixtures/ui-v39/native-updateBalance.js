@@ -1,0 +1,1 @@
+const A=async()=>{if(!r.value)try{r.value=!0;const{result:v,data:S,serviceTime:O}=await we();return v&&L((S==null?void 0:S.balance)||0),{serviceTime:O}}catch{return{serviceTime:0}}finally{r.value=!1}};window.updateBalance39=A;

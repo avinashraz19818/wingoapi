@@ -1,0 +1,30 @@
+ve = N({
+        __name: "Wallet",
+        setup(w) {
+            const {
+                balance: g,
+                updateBalance: _
+            } = oe(), t = I(), m = l => {
+                t.push({
+                    name: l
+                })
+            };
+            return (l, n) => {
+                const i = V;
+                return o(), v("div", ce, [e("div", re, [e("div", ue, [e("span", null, s(C(E)(C(g))), 1), $(i, {
+                    onClick: C(_),
+                    name: "icon_refresh",
+                    iconClass: "refresh"
+                }, null, 8, ["onClick"])]), e("div", de, [$(i, {
+                    name: "icon_nva_wallet"
+                }), e("div", null, s(l.$t("common.walletBalance")), 1)]), e("div", me, [e("div", {
+                    onClick: n[0] || (n[0] = r => m("withdraw"))
+                }, s(l.$t("common.withdraw")), 1), e("div", {
+                    onClick: n[1] || (n[1] = r => m("recharge"))
+                }, s(l.$t("common.recharge")), 1)])])])
+            }
+        }
+    }),
+    _e = B(ve, [
+        ["__scopeId", "data-v-af90d420"]
+    ]),

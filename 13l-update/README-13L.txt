@@ -1,3 +1,35 @@
+V39 — ORIGINAL DHANI WALLET REFRESH ICON + VERIFIED NATIVE BALANCE FLOW
+====================================================================
+User reference IMG_20260908_185809_002.jpg points to refresh beside balance.
+Dhani Wallet uses icon_refresh-D4CLgdqF.js and onClick:updateBalance.
+13L Wallet already has the same handler and identical SVG path geometry, but
+icon_refresh-DPLVldFv.js uses hard-coded #383A4C, nearly invisible on dark wallet.
+
+- Exact438B Dhani SVG string inserted inside the EXISTING native .ar_icon.refresh
+  span only. Host node and Vue onClick are never replaced. White/theme stroke
+  uses var(--text_color_L1), matching Dhani. Scoped CSS covers the initial paint.
+- Compared both native hooks: /Lottery/GetBalance, balanceLoading concurrent-call
+  guard, successful shared balance update, failure preserves balance, finally
+  clears loading. Keep13L native handler/auth/API/store; no invented balance,
+  new wallet API wrapper, auth/token discovery or duplicate refresh subscription.
+- Add accessible name/role/tabindex to existing host; Enter/Space invokes that
+  same native click. Diagnostics only log wallet39 ready/click and stroke color,
+  never the balance. Original markup/attributes/listeners restored off WinGo;
+  no duplicate icon and native re-render host remains intact.
+- Native icon size1em, margin and wallet geometry unchanged. Deposit/Withdraw
+  retain native routes. Header/Dhani sound, v37 pending lock, v38 winning art,
+  history and native countdown module/manifests unchanged. Same31-file whitelist.
+
+Validation: exact SVG bytes and matching path geometry; actual extracted native
+Wallet renderer + native updateBalance function in productionVue, six widths
+320/360/390/393/411/430. Visible theme stroke, host identity, successful update,
+concurrent-call suppression, failed request/result preserves balance, validzero,
+keyboard, repeated native SVG render, Deposit/Withdraw routes, cleanup/reentry
+and no overlap PASS. Provider replies are simulated, not real account requests.
+Native round/installer/art restore, header35, pending37, winning38, timer32,
+backdrop33/scroll34/fonts31/compiled keys30 regressions PASS. No wagers placed.
+Live byte/net verification and a refreshed phone button tap remain separate checks.
+
 V38 — RESTORE MISSING ORIGINAL WINNING POPUP ART
 ===============================================
 User screenshot Screenshot_2026-09-08-18-53-34-81_40deb401b9ffe8e1df2f1cc5ba480b12.jpg

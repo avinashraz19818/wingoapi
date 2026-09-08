@@ -1,0 +1,19 @@
+j = async () => {
+            if (!s.value) try {
+                s.value = !0;
+                const {
+                    result: t,
+                    data: o,
+                    serviceTime: d
+                } = await fe();
+                return t && te((o == null ? void 0 : o.balance) || 0), {
+                    serviceTime: d
+                }
+            } catch {
+                return {
+                    serviceTime: 0
+                }
+            } finally {
+                s.value = !1
+            }
+        },

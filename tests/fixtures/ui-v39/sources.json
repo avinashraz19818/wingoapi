@@ -1,0 +1,14 @@
+{
+  "dhaniSVG": "https://dhaniwin.club9.eu.cc/js/icon_refresh-D4CLgdqF.js",
+  "svgBytes": 438,
+  "svgSha256": "1b95be68d04bc3156a9ea9cda7ee85b6d76d56064040af5f97c63828709b7107",
+  "nativeSVG": "https://13l.club9.eu.cc/js/icon_refresh-DPLVldFv.js",
+  "geometryIdentical": true,
+  "difference": "native hard-coded #383A4C versus Dhani var(--text_color_L1)",
+  "nativeWallet": "https://13l.club9.eu.cc/js/tips-DJIxz9GI.js",
+  "dhaniWallet": "https://dhaniwin.club9.eu.cc/js/Winning-CbXrd0EO.js",
+  "nativeBalanceHook": "https://13l.club9.eu.cc/js/main.vue_vue_type_style_index_0_scoped_cf719de6_lang-BLJh8Idj.js",
+  "dhaniBalanceHook": "https://dhaniwin.club9.eu.cc/js/WingoSkeleton.vue_vue_type_style_index_0_scoped_cd4f34e3_lang-CZJCWYiN.js",
+  "endpoint": "/Lottery/GetBalance",
+  "flow": "balanceLoading guards concurrent refresh; success updates shared balance; failure preserves prior balance; finally clears loading"
+}
