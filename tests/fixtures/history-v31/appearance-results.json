@@ -1,0 +1,197 @@
+[
+  {
+    "width": 320,
+    "match": true,
+    "chip": {
+      "width": 30.71875,
+      "height": 30.71875,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "20.48px",
+      "fontWeight": "400",
+      "lineHeight": "30.72px",
+      "borderRadius": "8.53344px"
+    },
+    "period": {
+      "width": 187.125,
+      "height": 17.921875,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "11.9466px",
+      "fontWeight": "500",
+      "lineHeight": "17.92px",
+      "borderRadius": "0px"
+    },
+    "actualFonts": [
+      {
+        "familyName": "Poppins Medium",
+        "postScriptName": "Poppins-Medium",
+        "isCustomFont": true,
+        "glyphCount": 17
+      }
+    ],
+    "amountFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Regular",
+        "isCustomFont": true,
+        "glyphCount": 8
+      }
+    ],
+    "rows": 10
+  },
+  {
+    "width": 360,
+    "match": true,
+    "chip": {
+      "width": 34.546875,
+      "height": 34.546875,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "23.04px",
+      "fontWeight": "400",
+      "lineHeight": "34.56px",
+      "borderRadius": "9.60012px"
+    },
+    "period": {
+      "width": 212.1875,
+      "height": 20.15625,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "13.4399px",
+      "fontWeight": "500",
+      "lineHeight": "20.16px",
+      "borderRadius": "0px"
+    },
+    "actualFonts": [
+      {
+        "familyName": "Poppins Medium",
+        "postScriptName": "Poppins-Medium",
+        "isCustomFont": true,
+        "glyphCount": 17
+      }
+    ],
+    "amountFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Regular",
+        "isCustomFont": true,
+        "glyphCount": 8
+      }
+    ],
+    "rows": 10
+  },
+  {
+    "width": 390,
+    "match": true,
+    "chip": {
+      "width": 37.4375,
+      "height": 37.4375,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "24.96px",
+      "fontWeight": "400",
+      "lineHeight": "37.44px",
+      "borderRadius": "10.4001px"
+    },
+    "period": {
+      "width": 230.90625,
+      "height": 21.84375,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "14.5599px",
+      "fontWeight": "500",
+      "lineHeight": "21.84px",
+      "borderRadius": "0px"
+    },
+    "actualFonts": [
+      {
+        "familyName": "Poppins Medium",
+        "postScriptName": "Poppins-Medium",
+        "isCustomFont": true,
+        "glyphCount": 17
+      }
+    ],
+    "amountFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Regular",
+        "isCustomFont": true,
+        "glyphCount": 8
+      }
+    ],
+    "rows": 10
+  },
+  {
+    "width": 411,
+    "match": true,
+    "chip": {
+      "width": 38.390625,
+      "height": 38.390625,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "25.6px",
+      "fontWeight": "400",
+      "lineHeight": "38.4px",
+      "borderRadius": "10.6668px"
+    },
+    "period": {
+      "width": 249.203125,
+      "height": 22.40625,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "14.9332px",
+      "fontWeight": "500",
+      "lineHeight": "22.4px",
+      "borderRadius": "0px"
+    },
+    "actualFonts": [
+      {
+        "familyName": "Poppins Medium",
+        "postScriptName": "Poppins-Medium",
+        "isCustomFont": true,
+        "glyphCount": 17
+      }
+    ],
+    "amountFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Regular",
+        "isCustomFont": true,
+        "glyphCount": 8
+      }
+    ],
+    "rows": 10
+  },
+  {
+    "width": 430,
+    "match": true,
+    "chip": {
+      "width": 38.390625,
+      "height": 38.390625,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "25.6px",
+      "fontWeight": "400",
+      "lineHeight": "38.4px",
+      "borderRadius": "10.6668px"
+    },
+    "period": {
+      "width": 268.203125,
+      "height": 22.40625,
+      "fontFamily": "\"13L History Poppins\", Poppins, Arial, sans-serif",
+      "fontSize": "14.9332px",
+      "fontWeight": "500",
+      "lineHeight": "22.4px",
+      "borderRadius": "0px"
+    },
+    "actualFonts": [
+      {
+        "familyName": "Poppins Medium",
+        "postScriptName": "Poppins-Medium",
+        "isCustomFont": true,
+        "glyphCount": 17
+      }
+    ],
+    "amountFonts": [
+      {
+        "familyName": "Poppins",
+        "postScriptName": "Poppins-Regular",
+        "isCustomFont": true,
+        "glyphCount": 8
+      }
+    ],
+    "rows": 10
+  }
+]
