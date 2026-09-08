@@ -1,3 +1,13 @@
+V29 LIVE-SMOKE FOLLOW-UP
+=======================
+Provider capped a 100-row request at ten, with current period among them.
+Adapter now follows pageNo (bounded by 12 pages / 8s fetch budget), validates
+and de-duplicates closed provider rows, caches a per-site/game provider-only
+window and stops if upstream ignores pageNo. No DB/deterministic fallback.
+First-page ten closed rows verified only after deployment; don't fabricate
+current/unknown results to force a count. Source CSS unchanged from v28;
+JS diagnostic markers bumped to boot29/history29/chart29.
+
 V28 — TARGETED HISTORY/CHART PATCH (2026-09-08)
 ==============================================
 Status: locally regression-tested; LIVE acceptance requires /13l-net.php PINGs.
