@@ -1,0 +1,98 @@
+[
+  {
+    "width": 320,
+    "logo": {
+      "left": 125.8671875,
+      "right": 194.1328125,
+      "width": 68.265625,
+      "height": 25.59375
+    },
+    "icons": 2,
+    "soundUsesNativeRef": true,
+    "supportRoute": "workOrder",
+    "depositKeepsRechargeAction": true,
+    "noOverlap": true,
+    "routeCleanup": true,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "logo": {
+      "left": 141.6015625,
+      "right": 218.3984375,
+      "width": 76.796875,
+      "height": 28.796875
+    },
+    "icons": 2,
+    "soundUsesNativeRef": true,
+    "supportRoute": "workOrder",
+    "depositKeepsRechargeAction": true,
+    "noOverlap": true,
+    "routeCleanup": true,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "logo": {
+      "left": 153.40625,
+      "right": 236.59375,
+      "width": 83.1875,
+      "height": 31.1875
+    },
+    "icons": 2,
+    "soundUsesNativeRef": true,
+    "supportRoute": "workOrder",
+    "depositKeepsRechargeAction": true,
+    "noOverlap": true,
+    "routeCleanup": true,
+    "errors": []
+  },
+  {
+    "width": 393,
+    "logo": {
+      "left": 154.5859375,
+      "right": 238.4140625,
+      "width": 83.828125,
+      "height": 31.4375
+    },
+    "icons": 2,
+    "soundUsesNativeRef": true,
+    "supportRoute": "workOrder",
+    "depositKeepsRechargeAction": true,
+    "noOverlap": true,
+    "routeCleanup": true,
+    "errors": []
+  },
+  {
+    "width": 411,
+    "logo": {
+      "left": 162.8359375,
+      "right": 248.1640625,
+      "width": 85.328125,
+      "height": 32
+    },
+    "icons": 2,
+    "soundUsesNativeRef": true,
+    "supportRoute": "workOrder",
+    "depositKeepsRechargeAction": true,
+    "noOverlap": true,
+    "routeCleanup": true,
+    "errors": []
+  },
+  {
+    "width": 430,
+    "logo": {
+      "left": 172.3359375,
+      "right": 257.6640625,
+      "width": 85.328125,
+      "height": 32
+    },
+    "icons": 2,
+    "soundUsesNativeRef": true,
+    "supportRoute": "workOrder",
+    "depositKeepsRechargeAction": true,
+    "noOverlap": true,
+    "routeCleanup": true,
+    "errors": []
+  }
+]

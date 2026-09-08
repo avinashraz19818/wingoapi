@@ -1,3 +1,33 @@
+V35 — DEPOSIT LABEL / SMALLER LOGO / HEADER SERVICE + SOUND
+=========================================================
+User supplied IMG_20260908_161755_075.jpg and IMG_20260908_161754_920.jpg.
+- WinGo wallet Recharge text becomes Deposit; only existing text node changed.
+  Native recharge route, event handlers, balance and withdrawal untouched.
+- Header logo centered at2.13333rem x.8rem with object-fit contain, retaining
+  the existing 13L logo asset. No clock/ball/image viewport heuristic.
+- White outline customer-service and native sound on/off controls at top right.
+  Service opens the existing /workOrder support centre via the app router.
+  Sound reads/writes the native AR_LOTTERY provided soundEffects ref (its own
+  setting/persistence setter), not a decorative toggle or an unrelated audio flag.
+  Disabled until that current game's native sound context is ready.
+- Only actual game-header/head-left structure gets new controls; no duplicates
+  on re-renders. Original header recharge pill hidden only on WinGo.
+- Off-route cleanup removes controls, restores label and original logo styles.
+- ui35 reports logo geometry, soundReady and Deposit presence; audio35 records
+  native toggle state. No balance/token data in these diagnostics.
+- Native v34 timer module / manifest / scheduler, provider/backend/engine/bets
+  and prior fonts/chips are unchanged. Same29-file package, no index replacement.
+
+Validation:320/360/390/393/411/430 logo/icon bounds, no overlap, native sound
+setter twice, existing support route, recharge and back actions, balance
+re-render, no duplicates, and K3/WinGo cleanup/re-entry PASS in production Vue.
+v34 native-round/errors/visibility/game isolation and installer tests PASS;
+v34 scroll, v32 timer, v33 backdrop, v31 font and compiled v30 history PASS.
+Actual PHONE v34 netlog16:19-16:20 also confirmed 30S20260908100051298->20260908100051299 and
+1M20260908100010649->20260908100010650 rollover/result, strayClocks0.
+These v35 appearance/action tests are fixtures; refreshed-phone v35 acceptance
+is still separate from deployed-file verification.
+
 V34 — CLOCK POSITION + NATIVE ROUND REFRESH / RETRY
 ==================================================
 User reported displaced tab clock on scroll, stale issue and history requiring
