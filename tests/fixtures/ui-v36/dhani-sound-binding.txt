@@ -1,0 +1,15 @@
+ }
+    }, {
+        soundBus: Be,
+        syncMuted: Le
+    } = Ge();
+    return Be.on(e => {
+        p.value = !e
+    }), H(() => t.soundEffects, e => Le(!e), {
+        immediate: !0
+    }), Re(() => {
+        F.on(() => {
+            g()
+        })
+    }), H(() => o.value, e => {
+        e === "hidden" ? g() : setTimeout(async () => {

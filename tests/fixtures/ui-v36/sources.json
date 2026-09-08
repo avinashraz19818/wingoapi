@@ -1,0 +1,17 @@
+{
+  "customer": {
+    "source": "https://dhaniwin.club9.eu.cc/js/gamesaas_customer-BX_8Vky9.js",
+    "svg_bytes": 5541,
+    "svg_sha256": "166d62d88a34bb865ea69858c35f2fc3215b3af5d2a2704fdb616ce47f782197"
+  },
+  "mute": {
+    "source": "https://dhaniwin.club9.eu.cc/js/gamesaas_mute-BofwDJTW.js",
+    "svg_bytes": 2141,
+    "svg_sha256": "d438224bee477cd94cefc466c94c84aa538b2fc5c75269f4a8e0f4958d369c15"
+  },
+  "unmute": {
+    "source": "https://dhaniwin.club9.eu.cc/js/gamesaas_unmute-B3AbcJ_b.js",
+    "svg_bytes": 1162,
+    "svg_sha256": "33a948d3837630bfebf7af39f1d31fd6add40c1484f62bf179e2602269d66a6a"
+  }
+}

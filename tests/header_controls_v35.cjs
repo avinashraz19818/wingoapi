@@ -19,7 +19,7 @@ for(const width of [320,360,390,393,411,430]){
  });
  await p.addScriptTag({path:root+'/js/13l-hist25.js'});await p.waitForTimeout(1100);
  const deposit=p.locator('.Wallet__C-balance-l3 > :nth-child(2)'),voice=p.locator('.header-voice35');assert.equal(await deposit.innerText(),'Deposit');assert.equal(await p.locator('[data-13l-controls35]').count(),1);assert.equal(await voice.isEnabled(),true);
- assert.equal(await voice.getAttribute('aria-pressed'),'false');await voice.click();assert.equal(await voice.getAttribute('aria-pressed'),'true');assert.equal(await p.evaluate(()=>audio.value),true);assert.equal(await p.evaluate(()=>localStorage.getItem('fixture-native-sound')),'1');
+ assert.equal(await voice.getAttribute('aria-pressed'),'false');assert.equal(await voice.getAttribute('data-icon36'),'gamesaas_mute');await voice.click();assert.equal(await voice.getAttribute('aria-pressed'),'true');assert.equal(await voice.getAttribute('data-icon36'),'gamesaas_unmute');assert.equal(await p.evaluate(()=>audio.value),true);assert.equal(await p.evaluate(()=>localStorage.getItem('fixture-native-sound')),'1');
  await voice.click();assert.equal(await p.evaluate(()=>audio.value),false);assert.equal(await voice.getAttribute('aria-label'),'Turn sound on');
  await p.locator('.header-service35').click();await deposit.click();await p.locator('#back').click();
  assert.deepEqual(await p.evaluate(()=>actions),['sound:true','sound:false','route:workOrder','recharge','back']);

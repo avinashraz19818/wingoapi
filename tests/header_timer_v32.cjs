@@ -15,7 +15,10 @@ for(const width of [320,360,390,411,430]){
   window.actions={};['back','sound','withdraw','deposit','rules'].forEach(id=>document.getElementById(id).onclick=()=>actions[id]=(actions[id]||0)+1);
  });
  assert.notEqual(await p.locator('.Wallet__C').evaluate(e=>getComputedStyle(e,'::before').display),'none','baseline must reproduce red layer');
- await p.addScriptTag({path:root+'/js/13l-hist25.js'});await p.evaluate(()=>document.fonts.ready);
+ await p.addScriptTag({path:root+'/js/13l-hist25.js'});
+ // v36: this fixture represents an already-loaded native round, not its pending state.
+ await p.evaluate(()=>{const io={game:()=>location.pathname.split('/').pop(),seconds:()=>56,setSeconds:()=>{},rows:()=>{},sound:()=>{},notify:()=>{},issue:async()=>{},history:async()=>{}};const adapter=window.__13lRound34(io);const data={issueNumber:'20260907100010789',countdown:56};if(adapter.acceptIssue(data,io.game()))adapter.received(data);});
+ await p.evaluate(()=>document.fonts.ready);
  const data=await p.evaluate(()=>{
   const wallet=document.querySelector('.Wallet__C'),ticket=document.querySelector('.TimeLeft__C'),cs=getComputedStyle(document.querySelector('.TimeLeft__C-time>div'));
   return {redLayer:getComputedStyle(wallet,'::before').display,wallet:getComputedStyle(document.querySelector('.Wallet__C-balance')).backgroundColor,header:getComputedStyle(document.querySelector('.game-header')).backgroundColor,ticketImage:getComputedStyle(ticket).backgroundImage,cell:cs.backgroundColor,digit:cs.color,font:cs.fontFamily,weight:cs.fontWeight,label:getComputedStyle(document.querySelector('.TimeLeft__C-text')).color,period:getComputedStyle(document.querySelector('.TimeLeft__C-id')).color,bounds:[...document.querySelectorAll('.TimeLeft__C-rule,.TimeLeft__C-id,.TimeLeft__C-text,.TimeLeft__C-time')].map(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};}),ticket:(()=>{const r=ticket.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};})()};

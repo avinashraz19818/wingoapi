@@ -1,0 +1,62 @@
+[
+  {
+    "width": 320,
+    "pendingPlaceholder": true,
+    "nativeZeroUntouched": true,
+    "realZeroVisible": true,
+    "lateResponseRejected": true,
+    "loadedCountdown": "02:05",
+    "noOverflow": true,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "pendingPlaceholder": true,
+    "nativeZeroUntouched": true,
+    "realZeroVisible": true,
+    "lateResponseRejected": true,
+    "loadedCountdown": "02:05",
+    "noOverflow": true,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "pendingPlaceholder": true,
+    "nativeZeroUntouched": true,
+    "realZeroVisible": true,
+    "lateResponseRejected": true,
+    "loadedCountdown": "02:05",
+    "noOverflow": true,
+    "errors": []
+  },
+  {
+    "width": 393,
+    "pendingPlaceholder": true,
+    "nativeZeroUntouched": true,
+    "realZeroVisible": true,
+    "lateResponseRejected": true,
+    "loadedCountdown": "02:05",
+    "noOverflow": true,
+    "errors": []
+  },
+  {
+    "width": 411,
+    "pendingPlaceholder": true,
+    "nativeZeroUntouched": true,
+    "realZeroVisible": true,
+    "lateResponseRejected": true,
+    "loadedCountdown": "02:05",
+    "noOverflow": true,
+    "errors": []
+  },
+  {
+    "width": 430,
+    "pendingPlaceholder": true,
+    "nativeZeroUntouched": true,
+    "realZeroVisible": true,
+    "lateResponseRejected": true,
+    "loadedCountdown": "02:05",
+    "noOverflow": true,
+    "errors": []
+  }
+]

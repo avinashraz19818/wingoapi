@@ -1,3 +1,39 @@
+V36 — SWITCH LOADING GUARD + ORIGINAL DHANIWIN HEADER ICONS / SOUND BINDING
+==========================================================================
+Scope: only initial/switch countdown presentation and the requested header controls.
+- Before this game's first validated native issue/countdown, digit cells show
+  --:-- rather than the native initial 00:00. Readiness comes from the actual
+  round adapter (not seconds==0). Genuine expiry zero stays visible; the native
+  bet lock, server-derived deadline, rollover/retries and provider history remain.
+  Old-tab replies cannot release this gate. No guessed/stale countdown numbers.
+- Original DhaniWin gamesaas_customer/mute/unmute SVG strings extracted intact
+  from its main game-header assets, not redrawn approximations. Both actual audio
+  states retained. Original 13L logo/Deposit label, font/chips/layout unchanged.
+- Source-confirmed Dhani header: customer -> router workOrder; muted toggle ->
+  gameSound bus -> WinGo soundEffects setter; preference watcher syncs the icon.
+  Same routing/state transitions are bridged to 13L's own writable native ref.
+  No new standalone audio setting or global Howler mute unrelated to the game.
+- Phone v35 logs showed initial soundReady=0. To avoid relying on DOM/Vue context
+  discovery, native36 exposes ONLY soundEffects:ie through the existing adapter
+  IO (+16 bytes). Header reads/writes that actual computed ref, preserving native
+  preference persistence and sound behavior. Legacy public-ref lookup is fallback.
+- Native36 upgrade is SHA256-guarded, atomic with .bak36, accepts existing native34
+  or original through native34 first; already-upgraded modules are idempotent.
+  No main/index/skin bundle replacement. New tools/13l-native36.json only.
+- switch36 readiness, ui36 soundReady and audio36 muted beacons in /13l-net.php.
+- Package: original16 root PHP files + api/css/js/tools/README only, now30 files.
+
+Validation: exact SVG-byte comparisons; six phone widths320/360/390/393/411/430;
+loading/delayed response, genuine zero, rapid-switch stale response, no overflow,
+Deposit/back/support actions and mute-state icons PASS in production Vue fixtures.
+Actual patched native composable test additionally verifies the direct audio
+bridge WITHOUT history/provides lookup; round/error/visibility/isolation PASS.
+Installer backup/hash/idempotence/unknown-build refusal/index unchanged/emitted JS
+PASS. Scroll34/backdrop33/timer32/fonts31/compiled keys30 regressions PASS.
+Live public-provider 30S fixture: issue20260908100051542 ->51543, closed result
+51542 present, errors0. This is NOT logged-in phone audibility/appearance proof.
+Live deployed-file hashes and refreshed-phone v36 logs remain separate checks.
+
 V35 — DEPOSIT LABEL / SMALLER LOGO / HEADER SERVICE + SOUND
 =========================================================
 User supplied IMG_20260908_161755_075.jpg and IMG_20260908_161754_920.jpg.
