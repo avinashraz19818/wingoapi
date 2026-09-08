@@ -1,0 +1,81 @@
+{
+  "pass": true,
+  "mounts": [
+    "MyRecord:WinGo_30S",
+    "MyRecord:WinGo_30S",
+    "MyRecord:WinGo_1M",
+    "Chart:WinGo_1M",
+    "Chart:WinGo_5M",
+    "Chart:WinGo_3M",
+    "MyRecord:WinGo_3M",
+    "MyRecord:WinGo_30S"
+  ],
+  "unmounts": [
+    "MyRecord:WinGo_30S",
+    "MyRecord:WinGo_30S",
+    "MyRecord:WinGo_1M",
+    "Chart:WinGo_1M",
+    "Chart:WinGo_5M",
+    "Chart:WinGo_3M",
+    "MyRecord:WinGo_3M"
+  ],
+  "apiCalls": [
+    {
+      "kind": "MyRecord",
+      "game": "WinGo_30S",
+      "page": 1
+    },
+    {
+      "kind": "MyRecord",
+      "game": "WinGo_30S",
+      "page": 1
+    },
+    {
+      "kind": "MyRecord",
+      "game": "WinGo_30S",
+      "page": 2
+    },
+    {
+      "kind": "MyRecord",
+      "game": "WinGo_30S",
+      "page": 3
+    },
+    {
+      "kind": "MyRecord",
+      "game": "WinGo_1M",
+      "page": 1
+    },
+    {
+      "kind": "Chart",
+      "game": "WinGo_1M",
+      "page": 1
+    },
+    {
+      "kind": "Chart",
+      "game": "WinGo_1M",
+      "page": 2
+    },
+    {
+      "kind": "Chart",
+      "game": "WinGo_5M",
+      "page": 1
+    },
+    {
+      "kind": "Chart",
+      "game": "WinGo_3M",
+      "page": 1
+    },
+    {
+      "kind": "MyRecord",
+      "game": "WinGo_3M",
+      "page": 1
+    },
+    {
+      "kind": "MyRecord",
+      "game": "WinGo_30S",
+      "page": 1
+    }
+  ],
+  "betMounts": 1,
+  "errors": []
+}

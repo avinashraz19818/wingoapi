@@ -1,0 +1,46 @@
+[
+  {
+    "width": 320,
+    "hiddenBefore": 8,
+    "failures": 0,
+    "frames": 319,
+    "maxRight": 308,
+    "unchanged": true,
+    "chart": 10,
+    "unrelated": "none",
+    "errors": []
+  },
+  {
+    "width": 360,
+    "hiddenBefore": 8,
+    "failures": 0,
+    "frames": 319,
+    "maxRight": 348,
+    "unchanged": true,
+    "chart": 10,
+    "unrelated": "none",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "hiddenBefore": 8,
+    "failures": 0,
+    "frames": 319,
+    "maxRight": 378,
+    "unchanged": true,
+    "chart": 10,
+    "unrelated": "none",
+    "errors": []
+  },
+  {
+    "width": 430,
+    "hiddenBefore": 8,
+    "failures": 0,
+    "frames": 319,
+    "maxRight": 418,
+    "unchanged": true,
+    "chart": 10,
+    "unrelated": "none",
+    "errors": []
+  }
+]

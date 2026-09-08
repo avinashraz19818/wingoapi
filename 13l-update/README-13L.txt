@@ -1,3 +1,23 @@
+V30 — PER-GAME NATIVE VIEW LIFECYCLE + ORIGINAL TYPOGRAPHY
+=======================================================
+UI-only update. Server per-game filtering verified: 30S total11, 1M total19,
+3M/5M total0 in the diagnostic account; no row from a different game.
+- Native WinGo history KeepAlive receives a selected-game key. Switching game
+  remounts ONLY history/Chart, clears old pagination/cache and prevents late
+  responses from unmounted history views appearing in the newly selected game.
+- Uses Vue's native row templates, API calls, authentication and detail actions.
+  No all-game filler, token scan, bet/wallet changes or compiled-bundle edits.
+- Original native/DhaniWin font sizes restored: period .37333rem, time .32rem,
+  chart period .32rem, chip .96rem; original badge/row spacing. Palette inherited.
+- Vue production builds without DOM __vueParentComponent use mounted VNode walk.
+- Tests: KeepAlive+Suspense plain-render AND optimized compiled-template fixtures,
+  delayed old response, four games including empty3M, page reset and betting
+  component mounted only once. Legacy hide timers: 320/360/390/430px, >5s,
+  ten visible chart rows, no hidden tested cells or horizontal clipping.
+- Live acceptance after deployment requires phone key30/history30/chart30 PINGs.
+  key30 confirms native history render hook. history30 reports selected game and
+  wrong-prefix count plus font size. Do not call local fixtures live proof.
+
 V29 LIVE-SMOKE FOLLOW-UP
 =======================
 Provider capped a 100-row request at ten, with current period among them.
