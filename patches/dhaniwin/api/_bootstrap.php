@@ -3019,7 +3019,10 @@ function api_lottery_record_page(array $input): array
         $realAmount = max(0.0, round($stakeAmount - $fee, 4));
         $profitAmount = $statusText === 'pending' ? 0.0 : (float) $row['profit_amount'];
         $winLoseAmount = $statusText === 'pending' ? 0.0 : ($statusText === 'won' ? (float)$row['win_amount'] - $stakeAmount : -$stakeAmount);
-        $createdMs = strtotime((string) $row['created_at']) ? strtotime((string) $row['created_at']) * 1000 : api_now_ms();
+        // Display bet time one minute behind the server record.
+        $createdMs = strtotime((string) $row['created_at'])
+            ? (strtotime((string) $row['created_at']) * 1000) - 60000
+            : api_now_ms() - 60000;
         $list[] = [
             'orderNo' => (string) $row['order_no'],
             'issueNumber' => (string) $row['issue_number'],
@@ -3046,7 +3049,7 @@ function api_lottery_record_page(array $input): array
             'result_premium' => $resultPremium,
             'betTime' => $createdMs,
             'createTime' => $createdMs,
-            'createdTime' => (string) $row['created_at'],
+            'createdTime' => date('Y-m-d H:i:s', max(0, strtotime((string) $row['created_at']) - 60)),
         ];
     }
 
