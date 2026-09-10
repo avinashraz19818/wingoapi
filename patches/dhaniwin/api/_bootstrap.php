@@ -2878,14 +2878,34 @@ function api_lottery_game_from_issue(string $issueNumber): ?string
     return $map[$prefix] ?? null;
 }
 
-function api_lottery_issue_closed(string $gameCode, string $issueNumber): bool
-{
+function api_lottery_issue_closed(
+    string $gameCode,
+    string $issueNumber
+): bool {
     if ($issueNumber === '') {
         return false;
     }
-    $resolvedGame = api_lottery_game_from_issue($issueNumber) ?: api_lottery_normalize_game_code($gameCode) ?: 'WinGo_30S';
-    $current = (string) api_lottery_issue_data($resolvedGame)['issueNumber'];
-    return strcmp($issueNumber, $current) < 0;
+
+    $resolvedGame =
+        api_lottery_game_from_issue($issueNumber)
+        ?: api_lottery_normalize_game_code($gameCode)
+        ?: 'WinGo_30S';
+
+    // The API displays one period behind. The next issue is the actual
+    // currently open period, so any smaller issue already has a result.
+    $issueData = api_lottery_issue_data($resolvedGame);
+    $nextIssue = (string) (
+        $issueData['nextIssueNumber']
+        ?? $issueData['next_issue_number']
+        ?? ''
+    );
+
+    if ($nextIssue !== '') {
+        return strcmp($issueNumber, $nextIssue) < 0;
+    }
+
+    $currentIssue = (string) ($issueData['issueNumber'] ?? '');
+    return $currentIssue !== '' && strcmp($issueNumber, $currentIssue) < 0;
 }
 
 function api_lottery_settle_bet(array $bet): array
