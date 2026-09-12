@@ -1,0 +1,2 @@
+Final DhaniWin package: keeps dhaniwin1.club9.eu.cc/domain and dhsuraj database settings, includes instant settlement changes, admin wallet/game sync, and fixes approved deposits to credit BOTH wallet_balance and game_balance.
+Overwrite matching files. Existing approved orders are not credited again; only newly approved deposits after this fix are credited to both. Do not run old rollback packages.
