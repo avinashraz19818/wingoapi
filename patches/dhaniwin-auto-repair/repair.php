@@ -3,8 +3,24 @@ declare(strict_types=1);
 // Run from DhaniWin root: php repair.php
 // Remove this file after running.
 header('Content-Type: text/plain; charset=utf-8');
-$configFile = __DIR__ . '/api/config.php';
-if (!is_file($configFile)) { exit("ERROR: upload this folder into DhaniWin root.\n"); }
+$candidates = [
+    __DIR__ . '/api/config.php',
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/config.php',
+    __DIR__ . '/../api/config.php',
+];
+$configFile = '';
+foreach ($candidates as $candidate) {
+    if ($candidate !== '' && is_file($candidate)) {
+        $configFile = $candidate;
+        break;
+    }
+}
+if ($configFile === '') {
+    exit("ERROR: api/config.php not found. Extract repair.php directly into the same folder that contains the api folder.
+Checked:
+" . implode("
+", $candidates));
+}
 $config = require $configFile;
 $db = $config['db']['mysql'] ?? [];
 $host = getenv('DHANI_DB_HOST') ?: ($db['host'] ?? 'localhost');
