@@ -1,0 +1,1 @@
+Captcha-free login backend fix. Upload evenvessis/api/webapi/Login.php and overwrite. It accepts login requests without captcha fields, supplies safe defaults, and avoids a fatal DB-result error. Keep RegisterState captcha=0 package too.
