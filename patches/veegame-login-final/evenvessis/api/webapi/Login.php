@@ -21,8 +21,13 @@
 	$shonubody = file_get_contents("php://input");
 	$shonupost = json_decode($shonubody, true);
 	if ($_SERVER['REQUEST_METHOD'] != 'GET') {		
-		if (isset($shonupost['language']) && isset($shonupost['logintype']) && isset($shonupost['phonetype']) && isset($shonupost['pwd'])
-			&& isset($shonupost['random']) && isset($shonupost['signature']) && isset($shonupost['timestamp']) && isset($shonupost['username'])) {
+		if (isset($shonupost['username']) && isset($shonupost['pwd'])) {
+            $shonupost['language'] = $shonupost['language'] ?? 0;
+            $shonupost['logintype'] = $shonupost['logintype'] ?? 'mobile';
+            $shonupost['phonetype'] = $shonupost['phonetype'] ?? 0;
+            $shonupost['random'] = $shonupost['random'] ?? '';
+            $shonupost['signature'] = $shonupost['signature'] ?? '';
+            $shonupost['timestamp'] = $shonupost['timestamp'] ?? time();
 			$language = htmlspecialchars(mysqli_real_escape_string($conn, $shonupost['language']));
 			$logintype = htmlspecialchars(mysqli_real_escape_string($conn, $shonupost['logintype']));
 			$phonetype = htmlspecialchars(mysqli_real_escape_string($conn, $shonupost['phonetype']));
