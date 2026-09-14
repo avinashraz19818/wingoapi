@@ -1,0 +1,1 @@
+Upload all files preserving paths. This combined package enables active betting, fixes false 402 bet response, and falls back to existing Veegame WinGo history when external history is unavailable. Backup files first. Clear cache after upload. Run the activate_wingo.php from the betting-enable package separately if migration_state remains preview.
