@@ -1,0 +1,1 @@
+WinGo history fallback. Upload saas_lottery/provider.php to the matching path after backing up the old file. It uses existing gellaluhogiondu_phalitansa history if the external draw history feed is unavailable. Clear cache and reload.
