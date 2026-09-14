@@ -12,7 +12,7 @@ $patterns = array(
     "\$bearer = explode(\" \", \$_SERVER['HTTP_AUTHORIZATION']);\n\t\t\t\t\$author = \$bearer[1];",
     "\$bearer = explode(\" \", \$_SERVER['HTTP_AUTHORIZATION']);\r\n\t\t\t\t\$author = \$bearer[1];"
 );
-$replacement = "\$authHeader = \$_SERVER['HTTP_AUTHORIZATION'] ?? '';\n                \$bearer = preg_split('/\\s+/', trim(\$authHeader));\n                \$author = \$bearer[1] ?? '';";
+$replacement = "\$authHeader = isset(\$_SERVER['HTTP_AUTHORIZATION']) ? \$_SERVER['HTTP_AUTHORIZATION'] : '';\n                \$bearer = preg_split('/\\s+/', trim(\$authHeader));\n                \$author = isset(\$bearer[1]) ? \$bearer[1] : '';";
 foreach ($patterns as $pattern) { if (strpos($src, $pattern) !== false) { $src = str_replace($pattern, $replacement, $src); $changed = true; break; } }
 if (strpos($src, '$sesnum = mysqli_num_rows($sesresult);') !== false) { $src = str_replace('$sesnum = mysqli_num_rows($sesresult);', '$sesnum = $sesresult instanceof mysqli_result ? mysqli_num_rows($sesresult) : 0;', $src); $changed = true; }
 if ($changed && file_put_contents($issueFile, $src) === false) exit("ERROR: Cannot write GetGameIssue.php. Check permissions.\n");
