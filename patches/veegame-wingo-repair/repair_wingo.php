@@ -15,11 +15,8 @@ foreach($tables as $t){$q=$conn->query("SHOW TABLES LIKE '".$conn->real_escape_s
 $src=file_get_contents($issueFile);
 $backup=$issueFile.'.backup-'.date('YmdHis');
 file_put_contents($backup,$src);
-$old='''$bearer = explode(" ", $_SERVER['HTTP_AUTHORIZATION']);
-				$author = $bearer[1];''';
-$new='''$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-                $bearer = preg_split('/\\s+/', trim($authHeader));
-                $author = $bearer[1] ?? '';''';
+$old="$bearer = explode(\" \", \\$_SERVER['HTTP_AUTHORIZATION']);\n\t\t\t\t$author = $bearer[1];";
+$new="$authHeader = \\$_SERVER['HTTP_AUTHORIZATION'] ?? '';\n                $bearer = preg_split('/\\\\s+/', trim($authHeader));\n                $author = $bearer[1] ?? '';";
 $changed=false;
 if(strpos($src,$old)!==false){$src=str_replace($old,$new,$src,1);$changed=true;}
 $old2="\$sesnum = mysqli_num_rows(\$sesresult);";
