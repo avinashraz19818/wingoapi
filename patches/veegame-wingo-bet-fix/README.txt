@@ -1,0 +1,1 @@
+Fresh veegame repo fix. The WinGoBet route was returning msgCode 402 on successful bets; the frontend interprets 402 as under maintenance. Upload api-live-v4/Lottery/index.php to the matching path and overwrite. Clear cache and test a small bet. Backup the old file first.
